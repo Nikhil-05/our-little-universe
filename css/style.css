@@ -1,0 +1,59 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: Georgia, "Times New Roman", serif;
+    background: #fdf8f5;
+    color: #3d2929;
+}
+
+.landing-page {
+    min-height: 100vh;
+
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+
+    text-align: center;
+
+    padding: 30px;
+}
+
+.heart {
+    font-size: 50px;
+    margin-bottom: 20px;
+}
+
+h1 {
+    font-size: 52px;
+    font-weight: 500;
+    margin-bottom: 15px;
+}
+
+p {
+    font-size: 18px;
+    opacity: 0.75;
+    margin-bottom: 35px;
+}
+
+.primary-button {
+    text-decoration: none;
+
+    background: #7b3f4a;
+    color: white;
+
+    padding: 14px 28px;
+
+    border-radius: 30px;
+
+    transition: 0.25s ease;
+}
+
+.primary-button:hover {
+    transform: translateY(-2px);
+    opacity: 0.9;
+}
