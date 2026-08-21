@@ -1,6 +1,9 @@
 <!DOCTYPE html>
+
 <html lang="en">
+
 <head>
+
     <meta charset="UTF-8">
 
     <meta
@@ -8,10 +11,15 @@
         content="width=device-width, initial-scale=1.0"
     >
 
-    <title>Login ❤️</title>
+    <title>Enter Our World ❤️</title>
 
-    <link rel="stylesheet" href="css/login.css">
+    <link
+        rel="stylesheet"
+        href="css/login.css"
+    >
+
 </head>
+
 
 <body>
 
@@ -19,46 +27,90 @@
 
         <div class="login-card">
 
-            <div class="heart">
+            <div class="login-heart">
                 ❤️
             </div>
 
-            <h1>Our Little Universe</h1>
 
-            <p>Only us.</p>
+            <p class="eyebrow">
+                OUR LITTLE UNIVERSE
+            </p>
 
-           <form id="loginForm">
 
-    <input
-        type="email"
-        id="email"
-        placeholder="Email"
-        autocomplete="email"
-        required
-    >
+            <h1>
+                Welcome back ❤️
+            </h1>
 
-    <input
-        type="password"
-        id="password"
-        placeholder="Password"
-        autocomplete="current-password"
-        required
-    >
 
-    <button type="submit">
-        Enter ❤️
-    </button>
+            <p class="login-subtitle">
+                Just us. Just our little world.
+            </p>
 
-    <p id="loginMessage"></p>
 
-</form>
+            <form
+                id="loginForm"
+                novalidate
+            >
+
+                <label
+                    for="email"
+                >
+                    Email
+                </label>
+
+                <input
+                    id="email"
+                    name="email"
+                    type="email"
+                    autocomplete="email"
+                    placeholder="your@email.com"
+                    required
+                >
+
+
+                <label
+                    for="password"
+                >
+                    Password
+                </label>
+
+                <input
+                    id="password"
+                    name="password"
+                    type="password"
+                    autocomplete="current-password"
+                    placeholder="Your password"
+                    required
+                >
+
+
+                <p
+                    id="loginMessage"
+                    class="login-message"
+                ></p>
+
+
+                <button
+                    id="loginButton"
+                    type="submit"
+                >
+                    Enter Our World ❤️
+                </button>
+
+            </form>
 
         </div>
 
     </main>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-<script src="js/config.js"></script>
-<script src="js/auth.js"></script>
+
+    <!-- Supabase -->
+ <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<script src="./config.js"></script>
+
+<script type="module" src="./js/login.js"></script>
+
 </body>
+
 </html>
