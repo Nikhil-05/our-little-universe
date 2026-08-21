@@ -27,11 +27,19 @@
     <header class="navbar">
 
         <div class="brand">
+
             <span>❤️</span>
+
             Our Little Universe
+
         </div>
 
-        <button id="logoutButton" class="logout-button">
+
+        <button
+            id="logoutButton"
+            class="logout-button"
+            type="button"
+        >
             Logout
         </button>
 
@@ -48,19 +56,31 @@
             OUR STORY
         </p>
 
+
         <h1>
+
             A collection of
-            <span>our little moments.</span>
+
+            <span>
+                our little moments.
+            </span>
+
         </h1>
 
+
         <p class="hero-description">
+
             Every picture. Every video.
+
             Every memory that became ours.
+
         </p>
+
 
         <button
             id="openUploadButton"
             class="primary-button"
+            type="button"
         >
             + Add a memory
         </button>
@@ -82,9 +102,11 @@
                     ❤️
                 </div>
 
+
                 <h2>
                     Our story starts here.
                 </h2>
+
 
                 <p>
                     Add your first memory together.
@@ -111,6 +133,7 @@
             <button
                 id="closeUploadButton"
                 class="close-button"
+                type="button"
                 aria-label="Close"
             >
                 ×
@@ -123,109 +146,20 @@
                     NEW MEMORY
                 </p>
 
+
                 <h2>
                     Add a little piece of us ❤️
                 </h2>
 
             </div>
 
-<!-- ============================= -->
-<!-- EDIT MEMORY MODAL -->
-<!-- ============================= -->
-
-<div
-    id="editModal"
-    class="modal hidden"
->
-
-    <div class="modal-content">
-
-        <button
-            id="closeEditButton"
-            class="close-button"
-            aria-label="Close"
-        >
-            ×
-        </button>
-
-
-        <div class="modal-header">
-
-            <p class="eyebrow">
-                EDIT MEMORY
-            </p>
-
-            <h2>
-                Change the little details ❤️
-            </h2>
-
-        </div>
-
-
-        <!-- TITLE -->
-
-        <label for="editMemoryTitle">
-            Title
-        </label>
-
-        <input
-            id="editMemoryTitle"
-            type="text"
-            maxlength="100"
-        >
-
-
-        <!-- DATE -->
-
-        <label for="editMemoryDate">
-            Date
-        </label>
-
-        <input
-            id="editMemoryDate"
-            type="date"
-        >
-
-
-        <!-- DESCRIPTION -->
-
-        <label for="editMemoryDescription">
-            Description
-        </label>
-
-        <textarea
-            id="editMemoryDescription"
-            rows="5"
-            maxlength="1000"
-        ></textarea>
-
-
-        <!-- MESSAGE -->
-
-        <p
-            id="editMessage"
-            class="upload-message"
-        ></p>
-
-
-        <!-- SAVE -->
-
-        <button
-            id="saveEditButton"
-            class="primary-button full-width"
-        >
-            Save Changes ❤️
-        </button>
-
-    </div>
-
-</div>
 
             <!-- TITLE -->
 
             <label for="memoryTitle">
                 Title
             </label>
+
 
             <input
                 id="memoryTitle"
@@ -241,6 +175,7 @@
                 Date
             </label>
 
+
             <input
                 id="memoryDate"
                 type="date"
@@ -252,6 +187,7 @@
             <label for="memoryDescription">
                 Description
             </label>
+
 
             <textarea
                 id="memoryDescription"
@@ -267,6 +203,7 @@
                 Photos & Videos
             </label>
 
+
             <div
                 id="dropZone"
                 class="drop-zone"
@@ -276,13 +213,16 @@
                     📸
                 </div>
 
+
                 <p>
                     Drop your memories here
                 </p>
 
+
                 <span>
                     or click to choose photos/videos
                 </span>
+
 
                 <input
                     id="mediaInput"
@@ -316,6 +256,7 @@
             <button
                 id="saveMemoryButton"
                 class="primary-button full-width"
+                type="button"
             >
                 Save Memory ❤️
             </button>
@@ -325,12 +266,115 @@
     </div>
 
 
-    <!-- SUPABASE -->
+    <!-- ============================= -->
+    <!-- EDIT MEMORY MODAL -->
+    <!-- ============================= -->
+
+    <div
+        id="editModal"
+        class="modal hidden"
+    >
+
+        <div class="modal-content">
+
+            <button
+                id="closeEditButton"
+                class="close-button"
+                type="button"
+                aria-label="Close"
+            >
+                ×
+            </button>
+
+
+            <div class="modal-header">
+
+                <p class="eyebrow">
+                    EDIT MEMORY
+                </p>
+
+
+                <h2>
+                    Change the little details ❤️
+                </h2>
+
+            </div>
+
+
+            <!-- TITLE -->
+
+            <label for="editMemoryTitle">
+                Title
+            </label>
+
+
+            <input
+                id="editMemoryTitle"
+                type="text"
+                maxlength="100"
+            >
+
+
+            <!-- DATE -->
+
+            <label for="editMemoryDate">
+                Date
+            </label>
+
+
+            <input
+                id="editMemoryDate"
+                type="date"
+            >
+
+
+            <!-- DESCRIPTION -->
+
+            <label for="editMemoryDescription">
+                Description
+            </label>
+
+
+            <textarea
+                id="editMemoryDescription"
+                rows="5"
+                maxlength="1000"
+            ></textarea>
+
+
+            <!-- MESSAGE -->
+
+            <p
+                id="editMessage"
+                class="upload-message"
+            ></p>
+
+
+            <!-- SAVE -->
+
+            <button
+                id="saveEditButton"
+                class="primary-button full-width"
+                type="button"
+            >
+                Save Changes ❤️
+            </button>
+
+        </div>
+
+    </div>
+
+
+    <!-- ============================= -->
+    <!-- SUPABASE + APPLICATION JS -->
+    <!-- ============================= -->
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <script src="js/config.js"></script>
+
     <script src="js/app.js"></script>
+
 
 </body>
 
