@@ -2,6 +2,15 @@
    SUPABASE CLIENT
 ========================================= */
 
+import { FFmpeg } from "@ffmpeg/ffmpeg";
+import {
+    fetchFile,
+    toBlobURL
+} from "@ffmpeg/util";
+
+import coreURL from "@ffmpeg/core?url";
+import wasmURL from "@ffmpeg/core/wasm?url";
+
 const supabaseClient = window.supabase.createClient(
     SUPABASE_URL,
     SUPABASE_KEY
@@ -18,6 +27,11 @@ let selectedFiles = [];
 
 let currentEditingMemory = null;
 
+let ffmpegInstance = null;
+let ffmpegLoadingPromise = null;
+
+
+
 
 /* =========================================
    FILE CONFIGURATION
@@ -28,12 +42,32 @@ const allowedTypes = [
     "image/png",
     "image/webp",
     "image/gif",
+
     "video/mp4",
-    "video/webm"
+    "video/webm",
+    "video/quicktime",
+    "video/x-matroska"
 ];
 
-const MAX_FILE_SIZE =
+
+/*
+ * Supabase Free upload limit.
+ *
+ * IMPORTANT:
+ * We compress before uploading.
+ */
+
+const MAX_UPLOAD_SIZE =
     50 * 1024 * 1024;
+
+
+/*
+ * ffmpeg.wasm currently documents
+ * a 1 GB maximum input size.
+ */
+
+const MAX_VIDEO_PROCESSING_SIZE =
+    1024 * 1024 * 1024;
 
 
 /* =========================================
@@ -55,7 +89,8 @@ async function checkAuthentication() {
             error
         );
 
-        window.location.href = "login.html";
+        window.location.href =
+            "login.html";
 
         return false;
     }
@@ -63,13 +98,16 @@ async function checkAuthentication() {
 
     if (!session) {
 
-        window.location.href = "login.html";
+        window.location.href =
+            "login.html";
 
         return false;
     }
 
 
-    currentUser = session.user;
+    currentUser =
+        session.user;
+
 
     return true;
 }
@@ -142,6 +180,7 @@ function closeModal() {
 
 
     if (!modal) {
+
         return;
     }
 
@@ -202,6 +241,7 @@ function resetUploadForm() {
 
 
     if (title) {
+
         title.value = "";
     }
 
@@ -216,21 +256,25 @@ function resetUploadForm() {
 
 
     if (description) {
+
         description.value = "";
     }
 
 
     if (input) {
+
         input.value = "";
     }
 
 
     if (preview) {
+
         preview.innerHTML = "";
     }
 
 
     if (message) {
+
         message.textContent = "";
     }
 
@@ -250,10 +294,64 @@ function resetUploadForm() {
 
 
 /* =========================================
+   FILE SIZE FORMATTER
+========================================= */
+
+function formatFileSize(
+    bytes
+) {
+
+    if (
+        !Number.isFinite(bytes) ||
+        bytes <= 0
+    ) {
+
+        return "0 KB";
+    }
+
+
+    if (bytes < 1024) {
+
+        return `${bytes} B`;
+    }
+
+
+    if (
+        bytes <
+        1024 * 1024
+    ) {
+
+        return `${(
+            bytes / 1024
+        ).toFixed(1)} KB`;
+    }
+
+
+    if (
+        bytes <
+        1024 * 1024 * 1024
+    ) {
+
+        return `${(
+            bytes / (1024 * 1024)
+        ).toFixed(1)} MB`;
+    }
+
+
+    return `${(
+        bytes /
+        (1024 * 1024 * 1024)
+    ).toFixed(2)} GB`;
+}
+
+
+/* =========================================
    FILE VALIDATION
 ========================================= */
 
-function validateFile(file) {
+function validateFile(
+    file
+) {
 
     if (
         !allowedTypes.includes(
@@ -262,6 +360,7 @@ function validateFile(file) {
     ) {
 
         return {
+
             valid: false,
 
             message:
@@ -270,21 +369,76 @@ function validateFile(file) {
     }
 
 
+    /* IMAGE */
+
     if (
-        file.size > MAX_FILE_SIZE
+        file.type.startsWith(
+            "image/"
+        )
     ) {
 
-        return {
-            valid: false,
+        /*
+         * We allow up to 50 MB original
+         * images because the browser will
+         * compress them before uploading.
+         */
 
-            message:
-                `${file.name} is larger than 50 MB.`
+        if (
+            file.size >
+            MAX_UPLOAD_SIZE
+        ) {
+
+            return {
+
+                valid: false,
+
+                message:
+                    `${file.name} is too large to process safely.`
+            };
+        }
+
+
+        return {
+            valid: true
+        };
+    }
+
+
+    /* VIDEO */
+
+    if (
+        file.type.startsWith(
+            "video/"
+        )
+    ) {
+
+        if (
+            file.size >
+            MAX_VIDEO_PROCESSING_SIZE
+        ) {
+
+            return {
+
+                valid: false,
+
+                message:
+                    `${file.name} is larger than 1 GB. Please trim the video before uploading.`
+            };
+        }
+
+
+        return {
+            valid: true
         };
     }
 
 
     return {
-        valid: true
+
+        valid: false,
+
+        message:
+            "Unsupported file type."
     };
 }
 
@@ -293,7 +447,9 @@ function validateFile(file) {
    ADD FILES
 ========================================= */
 
-function addFiles(files) {
+function addFiles(
+    files
+) {
 
     const incomingFiles =
         Array.from(files);
@@ -304,7 +460,9 @@ function addFiles(files) {
     ) {
 
         const validation =
-            validateFile(file);
+            validateFile(
+                file
+            );
 
 
         if (!validation.valid) {
@@ -349,6 +507,7 @@ function renderPreviews() {
 
 
     if (!preview) {
+
         return;
     }
 
@@ -375,6 +534,8 @@ function renderPreviews() {
                 );
 
 
+            /* IMAGE */
+
             if (
                 file.type.startsWith(
                     "image/"
@@ -387,7 +548,9 @@ function renderPreviews() {
                     );
 
 
-                image.src = url;
+                image.src =
+                    url;
+
 
                 image.alt =
                     file.name;
@@ -397,6 +560,9 @@ function renderPreviews() {
                     image
                 );
 
+
+            /* VIDEO */
+
             } else {
 
                 const video =
@@ -405,10 +571,13 @@ function renderPreviews() {
                     );
 
 
-                video.src = url;
+                video.src =
+                    url;
+
 
                 video.muted =
                     true;
+
 
                 video.preload =
                     "metadata";
@@ -419,6 +588,8 @@ function renderPreviews() {
                 );
             }
 
+
+            /* TYPE */
 
             const badge =
                 document.createElement(
@@ -443,10 +614,746 @@ function renderPreviews() {
             );
 
 
+            /* SIZE */
+
+            const size =
+                document.createElement(
+                    "small"
+                );
+
+
+            size.className =
+                "preview-size";
+
+
+            size.textContent =
+                formatFileSize(
+                    file.size
+                );
+
+
+            wrapper.appendChild(
+                size
+            );
+
+
             preview.appendChild(
                 wrapper
             );
         }
+    );
+}
+
+
+/* =========================================
+   IMAGE COMPRESSION
+========================================= */
+
+async function compressImage(
+    file
+) {
+
+    const bitmap =
+        await createImageBitmap(
+            file
+        );
+
+
+    const MAX_DIMENSION =
+        1600;
+
+
+    let width =
+        bitmap.width;
+
+
+    let height =
+        bitmap.height;
+
+
+    if (
+        width >
+        MAX_DIMENSION ||
+        height >
+        MAX_DIMENSION
+    ) {
+
+        const scale =
+            Math.min(
+                MAX_DIMENSION /
+                    width,
+
+                MAX_DIMENSION /
+                    height
+            );
+
+
+        width =
+            Math.round(
+                width *
+                scale
+            );
+
+
+        height =
+            Math.round(
+                height *
+                scale
+            );
+    }
+
+
+    const canvas =
+        document.createElement(
+            "canvas"
+        );
+
+
+    canvas.width =
+        width;
+
+
+    canvas.height =
+        height;
+
+
+    const context =
+        canvas.getContext(
+            "2d"
+        );
+
+
+    if (!context) {
+
+        bitmap.close();
+
+
+        throw new Error(
+            "Could not create image canvas."
+        );
+    }
+
+
+    context.imageSmoothingEnabled =
+        true;
+
+
+    context.imageSmoothingQuality =
+        "high";
+
+
+    context.drawImage(
+        bitmap,
+        0,
+        0,
+        width,
+        height
+    );
+
+
+    bitmap.close();
+
+
+    /*
+     * Try WebP first.
+     */
+
+    const webpBlob =
+        await new Promise(
+            (resolve) => {
+
+                canvas.toBlob(
+                    resolve,
+
+                    "image/webp",
+
+                    0.72
+                );
+            }
+        );
+
+
+    if (!webpBlob) {
+
+        throw new Error(
+            "Image compression failed."
+        );
+    }
+
+
+    /*
+     * If WebP is larger than the original,
+     * try JPEG.
+     */
+
+    if (
+        webpBlob.size >=
+        file.size
+    ) {
+
+        const jpegBlob =
+            await new Promise(
+                (resolve) => {
+
+                    canvas.toBlob(
+                        resolve,
+
+                        "image/jpeg",
+
+                        0.70
+                    );
+                }
+            );
+
+
+        if (
+            jpegBlob &&
+            jpegBlob.size <
+                webpBlob.size
+        ) {
+
+            return new File(
+                [
+                    jpegBlob
+                ],
+
+                replaceExtension(
+                    file.name,
+                    "jpg"
+                ),
+
+                {
+                    type:
+                        "image/jpeg",
+
+                    lastModified:
+                        Date.now()
+                }
+            );
+        }
+    }
+
+
+    return new File(
+        [
+            webpBlob
+        ],
+
+        replaceExtension(
+            file.name,
+            "webp"
+        ),
+
+        {
+            type:
+                "image/webp",
+
+            lastModified:
+                Date.now()
+        }
+    );
+}
+
+
+/* =========================================
+   REPLACE FILE EXTENSION
+========================================= */
+
+function replaceExtension(
+    fileName,
+    extension
+) {
+
+    const dot =
+        fileName.lastIndexOf(
+            "."
+        );
+
+
+    if (dot === -1) {
+
+        return `${fileName}.${extension}`;
+    }
+
+
+    return (
+        fileName.substring(
+            0,
+            dot
+        ) +
+        "." +
+        extension
+    );
+}
+
+
+/* =========================================
+   LOAD FFMPEG
+========================================= */
+
+async function loadFFmpeg(
+    statusCallback
+) {
+
+    if (ffmpegInstance) {
+        return ffmpegInstance;
+    }
+
+
+    if (ffmpegLoadingPromise) {
+        return ffmpegLoadingPromise;
+    }
+
+
+    ffmpegLoadingPromise =
+        (async () => {
+
+            if (statusCallback) {
+
+                statusCallback(
+                    "Loading video optimizer... ❤️"
+                );
+            }
+
+
+            const ffmpeg =
+                new FFmpeg();
+
+
+            ffmpeg.on(
+                "log",
+                ({ message }) => {
+
+                    console.log(
+                        "[FFmpeg]",
+                        message
+                    );
+                }
+            );
+
+
+            ffmpeg.on(
+                "progress",
+                ({ progress }) => {
+
+                    if (
+                        statusCallback &&
+                        Number.isFinite(
+                            progress
+                        )
+                    ) {
+
+                        statusCallback(
+                            `Compressing video... ${Math.round(progress * 100)}%`
+                        );
+                    }
+                }
+            );
+
+
+            /*
+             * Vite gives us the real URLs for
+             * ffmpeg-core.js and ffmpeg-core.wasm.
+             *
+             * toBlobURL avoids worker/module loading
+             * problems caused by the original URLs.
+             */
+
+            await ffmpeg.load({
+
+                coreURL:
+                    await toBlobURL(
+                        coreURL,
+                        "text/javascript"
+                    ),
+
+                wasmURL:
+                    await toBlobURL(
+                        wasmURL,
+                        "application/wasm"
+                    )
+            });
+
+
+            ffmpegInstance =
+                ffmpeg;
+
+
+            if (statusCallback) {
+
+                statusCallback(
+                    "Video optimizer ready ❤️"
+                );
+            }
+
+
+            return ffmpeg;
+
+        })();
+
+
+    try {
+
+        return await ffmpegLoadingPromise;
+
+    } catch (error) {
+
+        console.error(
+            "FFmpeg initialization failed:",
+            error
+        );
+
+
+        ffmpegLoadingPromise =
+            null;
+
+        ffmpegInstance =
+            null;
+
+
+        throw error;
+    }
+}
+
+/* =========================================
+   CONVERT FILE TO UINT8ARRAY
+========================================= */
+
+async function fileToUint8Array(
+    file
+) {
+
+    const buffer =
+        await file.arrayBuffer();
+
+
+    return new Uint8Array(
+        buffer
+    );
+}
+
+
+/* =========================================
+   SAFE FFMPEG DELETE
+========================================= */
+
+async function cleanupFFmpegFile(
+    ffmpeg,
+    fileName
+) {
+
+    try {
+
+        if (
+            ffmpeg.fs &&
+            typeof ffmpeg.fs.unlink ===
+                "function"
+        ) {
+
+            ffmpeg.fs.unlink(
+                fileName
+            );
+
+
+            return;
+        }
+
+
+        if (
+            typeof ffmpeg.deleteFile ===
+                "function"
+        ) {
+
+            await ffmpeg.deleteFile(
+                fileName
+            );
+        }
+
+    } catch (error) {
+
+        console.warn(
+            `Could not clean up ${fileName}:`,
+            error
+        );
+    }
+}
+
+
+/* =========================================
+   VIDEO COMPRESSION
+========================================= */
+
+async function compressVideo(
+    file,
+    statusCallback
+) {
+
+    const MAX_VIDEO_SIZE =
+        1024 *
+        1024 *
+        1024;
+
+
+    if (
+        file.size >
+        MAX_VIDEO_SIZE
+    ) {
+
+        throw new Error(
+            "This video is larger than 1 GB. Please trim it before uploading."
+        );
+    }
+
+
+    const ffmpeg =
+        await loadFFmpeg(
+            statusCallback
+        );
+
+
+    const inputName =
+        "input.mp4";
+
+
+    const outputName =
+        "optimized.mp4";
+
+
+    try {
+
+        statusCallback(
+            `Preparing ${formatFileSize(file.size)} video...`
+        );
+
+
+        await ffmpeg.writeFile(
+            inputName,
+            await fetchFile(file)
+        );
+
+
+        statusCallback(
+            "Compressing video... ❤️"
+        );
+
+
+        await ffmpeg.exec([
+
+            "-i",
+            inputName,
+
+            "-vf",
+            "scale=854:-2",
+
+            "-c:v",
+            "libx264",
+
+            "-preset",
+            "veryfast",
+
+            "-crf",
+            "29",
+
+            "-maxrate",
+            "900k",
+
+            "-bufsize",
+            "1800k",
+
+            "-r",
+            "24",
+
+            "-c:a",
+            "aac",
+
+            "-b:a",
+            "64k",
+
+            "-movflags",
+            "+faststart",
+
+            outputName
+        ]);
+
+
+        statusCallback(
+            "Finalizing optimized video..."
+        );
+
+
+        const outputData =
+            await ffmpeg.readFile(
+                outputName
+            );
+
+
+        const optimizedBlob =
+            new Blob(
+                [outputData],
+                {
+                    type:
+                        "video/mp4"
+                }
+            );
+
+
+        const optimizedFile =
+            new File(
+                [
+                    optimizedBlob
+                ],
+
+                replaceExtension(
+                    file.name,
+                    "mp4"
+                ),
+
+                {
+                    type:
+                        "video/mp4",
+
+                    lastModified:
+                        Date.now()
+                }
+            );
+
+
+        await ffmpeg.deleteFile(
+            inputName
+        );
+
+
+        await ffmpeg.deleteFile(
+            outputName
+        );
+
+
+        return optimizedFile;
+
+
+    } catch (error) {
+
+        try {
+
+            await ffmpeg.deleteFile(
+                inputName
+            );
+
+        } catch (_) {}
+
+
+        try {
+
+            await ffmpeg.deleteFile(
+                outputName
+            );
+
+        } catch (_) {}
+
+
+        throw error;
+    }
+}
+
+
+/* =========================================
+   VIDEO EXTENSION
+========================================= */
+
+function getVideoExtension(
+    mimeType
+) {
+
+    if (
+        mimeType ===
+        "video/webm"
+    ) {
+
+        return "webm";
+    }
+
+
+    if (
+        mimeType ===
+        "video/quicktime"
+    ) {
+
+        return "mov";
+    }
+
+
+    if (
+        mimeType ===
+        "video/x-matroska"
+    ) {
+
+        return "mkv";
+    }
+
+
+    return "mp4";
+}
+
+
+/* =========================================
+   OPTIMIZE MEDIA
+========================================= */
+
+async function optimizeMedia(
+    file,
+    statusCallback
+) {
+
+    statusCallback(
+        `Original size: ${formatFileSize(file.size)}`
+    );
+
+
+    if (
+        file.type.startsWith(
+            "image/"
+        )
+    ) {
+
+        const optimized =
+            await compressImage(
+                file
+            );
+
+
+        statusCallback(
+            `Photo optimized: ${formatFileSize(file.size)} → ${formatFileSize(optimized.size)}`
+        );
+
+
+        return optimized;
+    }
+
+
+    if (
+        file.type.startsWith(
+            "video/"
+        )
+    ) {
+
+        const optimized =
+            await compressVideo(
+                file,
+                statusCallback
+            );
+
+
+        statusCallback(
+            `Video optimized: ${formatFileSize(file.size)} → ${formatFileSize(optimized.size)}`
+        );
+
+
+        return optimized;
+    }
+
+
+    throw new Error(
+        "Unsupported media type."
     );
 }
 
@@ -492,7 +1399,7 @@ async function createMemory() {
     ) {
 
         console.error(
-            "Upload form elements missing."
+            "Upload form elements are missing."
         );
 
         return;
@@ -502,8 +1409,10 @@ async function createMemory() {
     const title =
         titleInput.value.trim();
 
+
     const date =
         dateInput.value;
+
 
     const description =
         descriptionInput.value.trim();
@@ -538,16 +1447,28 @@ async function createMemory() {
     }
 
 
+    if (!currentUser) {
+
+        message.textContent =
+            "Your session has expired. Please log in again.";
+
+        return;
+    }
+
+
     saveButton.disabled =
         true;
-
-    saveButton.textContent =
-        "Saving our memory... ❤️";
 
 
     try {
 
-        /* CREATE MEMORY */
+        /* =====================================
+           CREATE MEMORY
+        ===================================== */
+
+        message.textContent =
+            "Creating your memory... ❤️";
+
 
         const {
             data: memory,
@@ -555,16 +1476,19 @@ async function createMemory() {
         } = await supabaseClient
             .from("memories")
             .insert({
+
                 title,
 
                 description:
-                    description || null,
+                    description ||
+                    null,
 
                 memory_date:
                     date,
 
                 created_by:
                     currentUser.id
+
             })
             .select()
             .single();
@@ -576,7 +1500,9 @@ async function createMemory() {
         }
 
 
-        /* UPLOAD FILES */
+        /* =====================================
+           PROCESS EACH FILE
+        ===================================== */
 
         for (
             let index = 0;
@@ -584,16 +1510,69 @@ async function createMemory() {
             index++
         ) {
 
-            const file =
+            const originalFile =
                 selectedFiles[index];
 
 
+            const position =
+                index + 1;
+
+
             message.textContent =
-                `Uploading ${index + 1} of ${selectedFiles.length}...`;
+                `Optimizing ${position} of ${selectedFiles.length}... ❤️`;
+
+
+            let optimizedFile;
+
+
+            try {
+
+                optimizedFile =
+                    await optimizeMedia(
+                        originalFile,
+
+                        (status) => {
+
+                            message.textContent =
+                                `File ${position}/${selectedFiles.length}: ${status}`;
+                        }
+                    );
+
+            } catch (error) {
+
+                console.error(
+                    "Optimization failed:",
+                    error
+                );
+
+
+                throw new Error(
+                    `Could not optimize ${originalFile.name}. ${error.message}`
+                );
+            }
+
+
+            /*
+             * Final Supabase size check.
+             */
+
+            if (
+                optimizedFile.size >
+                MAX_UPLOAD_SIZE
+            ) {
+
+                throw new Error(
+                    `${originalFile.name} is still ${formatFileSize(optimizedFile.size)} after optimization, which is above the 50 MB upload limit.`
+                );
+            }
+
+
+            message.textContent =
+                `Uploading optimized ${position} of ${selectedFiles.length}...`;
 
 
             const extension =
-                file.name
+                optimizedFile.name
                     .split(".")
                     .pop()
                     .toLowerCase();
@@ -604,7 +1583,7 @@ async function createMemory() {
 
 
             const folder =
-                file.type.startsWith(
+                optimizedFile.type.startsWith(
                     "video/"
                 )
                     ? "videos"
@@ -622,16 +1601,18 @@ async function createMemory() {
                 .from("memory-media")
                 .upload(
                     filePath,
-                    file,
+                    optimizedFile,
                     {
+
                         contentType:
-                            file.type,
+                            optimizedFile.type,
 
                         cacheControl:
-                            "3600",
+                            "31536000",
 
                         upsert:
                             false
+
                     }
                 );
 
@@ -642,24 +1623,27 @@ async function createMemory() {
             }
 
 
-            /* SAVE MEDIA RECORD */
+            /* =================================
+               SAVE MEDIA RECORD
+            ================================= */
 
             const {
                 error: mediaError
             } = await supabaseClient
                 .from("media")
                 .insert({
+
                     memory_id:
                         memory.id,
 
                     file_name:
-                        file.name,
+                        optimizedFile.name,
 
                     file_path:
                         filePath,
 
                     media_type:
-                        file.type.startsWith(
+                        optimizedFile.type.startsWith(
                             "video/"
                         )
                             ? "video"
@@ -667,6 +1651,7 @@ async function createMemory() {
 
                     created_by:
                         currentUser.id
+
                 });
 
 
@@ -674,23 +1659,39 @@ async function createMemory() {
 
                 throw mediaError;
             }
+
+
+            console.log(
+                `Optimized:
+${originalFile.name}
+${formatFileSize(originalFile.size)}
+→
+${formatFileSize(optimizedFile.size)}`
+            );
         }
 
+
+        /* =====================================
+           SUCCESS
+        ===================================== */
 
         message.textContent =
             "Memory saved ❤️";
 
 
-        setTimeout(
-            async () => {
-
-                closeModal();
-
-                await loadMemories();
-
-            },
-            600
+        await new Promise(
+            (resolve) =>
+                setTimeout(
+                    resolve,
+                    800
+                )
         );
+
+
+        closeModal();
+
+
+        await loadMemories();
 
 
     } catch (error) {
@@ -702,11 +1703,13 @@ async function createMemory() {
 
 
         message.textContent =
+            error.message ||
             "Something went wrong while saving this memory.";
 
 
         saveButton.disabled =
             false;
+
 
         saveButton.textContent =
             "Save Memory ❤️";
@@ -727,6 +1730,7 @@ async function loadMemories() {
 
 
     if (!timeline) {
+
         return;
     }
 
@@ -748,7 +1752,7 @@ async function loadMemories() {
 
     const {
         data: memories,
-        error
+        error: memoriesError
     } = await supabaseClient
         .from("memories")
         .select(`
@@ -770,16 +1774,17 @@ async function loadMemories() {
         .order(
             "memory_date",
             {
-                ascending: false
+                ascending:
+                    false
             }
         );
 
 
-    if (error) {
+    if (memoriesError) {
 
         console.error(
             "Error loading memories:",
-            error
+            memoriesError
         );
 
 
@@ -800,6 +1805,7 @@ async function loadMemories() {
 
             </div>
         `;
+
 
         return;
     }
@@ -828,11 +1834,110 @@ async function loadMemories() {
             </div>
         `;
 
+
         return;
     }
 
 
-    timeline.innerHTML = "";
+    /* =====================================
+       LOAD COMMENTS SEPARATELY
+    ===================================== */
+
+    const mediaIds = [];
+
+
+    memories.forEach(
+        (memory) => {
+
+            memory.media =
+                memory.media || [];
+
+
+            memory.media.forEach(
+                (media) => {
+
+                    media.comments =
+                        [];
+
+
+                    mediaIds.push(
+                        media.id
+                    );
+                }
+            );
+        }
+    );
+
+
+    if (
+        mediaIds.length > 0
+    ) {
+
+        const {
+            data: comments,
+            error: commentsError
+        } = await supabaseClient
+            .from("comments")
+            .select(`
+                id,
+                media_id,
+                user_id,
+                comment_text,
+                parent_comment_id,
+                created_at
+            `)
+            .in(
+                "media_id",
+                mediaIds
+            )
+            .order(
+                "created_at",
+                {
+                    ascending:
+                        true
+                }
+            );
+
+
+        if (commentsError) {
+
+            console.warn(
+                "Comments could not be loaded. Memories will still be displayed:",
+                commentsError
+            );
+
+        } else {
+
+            const allComments =
+                comments || [];
+
+
+            memories.forEach(
+                (memory) => {
+
+                    memory.media.forEach(
+                        (media) => {
+
+                            media.comments =
+                                allComments.filter(
+                                    (comment) =>
+                                        comment.media_id ===
+                                        media.id
+                                );
+                        }
+                    );
+                }
+            );
+        }
+    }
+
+
+    /* =====================================
+       RENDER TIMELINE
+    ===================================== */
+
+    timeline.innerHTML =
+        "";
 
 
     for (
@@ -879,11 +1984,13 @@ async function getSignedMediaUrl(
             error
         );
 
+
         return null;
     }
 
 
-    return data?.signedUrl || null;
+    return data?.signedUrl ||
+        null;
 }
 
 
@@ -1013,7 +2120,9 @@ async function createMemoryElement(
 
     /* DESCRIPTION */
 
-    if (memory.description) {
+    if (
+        memory.description
+    ) {
 
         const description =
             document.createElement(
@@ -1066,6 +2175,7 @@ async function createMemoryElement(
 
 
             if (!signedUrl) {
+
                 continue;
             }
 
@@ -1115,7 +2225,7 @@ async function createMemoryElement(
     );
 
 
-    /* EDIT EVENT */
+    /* EDIT */
 
     editButton.addEventListener(
         "click",
@@ -1132,7 +2242,7 @@ async function createMemoryElement(
     );
 
 
-    /* DELETE EVENT */
+    /* DELETE */
 
     deleteButton.addEventListener(
         "click",
@@ -1169,11 +2279,24 @@ function createMediaElement(
 
 
     wrapper.className =
+        "media-wrapper";
+
+
+    const mediaItem =
+        document.createElement(
+            "div"
+        );
+
+
+    mediaItem.className =
         "media-item";
 
 
+    /* IMAGE */
+
     if (
-        media.media_type === "image"
+        media.media_type ===
+        "image"
     ) {
 
         const image =
@@ -1194,15 +2317,19 @@ function createMediaElement(
             "lazy";
 
 
-        wrapper.appendChild(
+        mediaItem.appendChild(
             image
         );
 
+
+    /* VIDEO */
+
     } else if (
-        media.media_type === "video"
+        media.media_type ===
+        "video"
     ) {
 
-        wrapper.classList.add(
+        mediaItem.classList.add(
             "media-video"
         );
 
@@ -1229,13 +2356,638 @@ function createMediaElement(
             true;
 
 
-        wrapper.appendChild(
+        mediaItem.appendChild(
             video
         );
     }
 
 
+    wrapper.appendChild(
+        mediaItem
+    );
+
+
+    /* COMMENTS */
+
+    const commentsSection =
+        createCommentsSection(
+            media
+        );
+
+
+    wrapper.appendChild(
+        commentsSection
+    );
+
+
     return wrapper;
+}
+
+
+/* =========================================
+   COMMENTS SECTION
+========================================= */
+
+function createCommentsSection(
+    media
+) {
+
+    const section =
+        document.createElement(
+            "div"
+        );
+
+
+    section.className =
+        "comments-section";
+
+
+    const comments =
+        media.comments || [];
+
+
+    /* HEADER */
+
+    const header =
+        document.createElement(
+            "div"
+        );
+
+
+    header.className =
+        "comments-header";
+
+
+    header.textContent =
+        comments.length > 0
+            ? `❤️ Comments (${comments.length})`
+            : "❤️ Comments";
+
+
+    section.appendChild(
+        header
+    );
+
+
+    /* COMMENT LIST */
+
+    const commentsList =
+        document.createElement(
+            "div"
+        );
+
+
+    commentsList.className =
+        "comments-list";
+
+
+    const rootComments =
+        comments.filter(
+            (comment) =>
+                !comment.parent_comment_id
+        );
+
+
+    rootComments.forEach(
+        (comment) => {
+
+            commentsList.appendChild(
+                createCommentElement(
+                    comment,
+                    comments,
+                    media.id
+                )
+            );
+        }
+    );
+
+
+    section.appendChild(
+        commentsList
+    );
+
+
+    /* NEW COMMENT */
+
+    const inputArea =
+        document.createElement(
+            "div"
+        );
+
+
+    inputArea.className =
+        "comment-input-area";
+
+
+    const input =
+        document.createElement(
+            "input"
+        );
+
+
+    input.type =
+        "text";
+
+
+    input.className =
+        "comment-input";
+
+
+    input.placeholder =
+        "Write something... ❤️";
+
+
+    input.maxLength =
+        500;
+
+
+    const button =
+        document.createElement(
+            "button"
+        );
+
+
+    button.type =
+        "button";
+
+
+    button.className =
+        "comment-button";
+
+
+    button.textContent =
+        "Post";
+
+
+    button.addEventListener(
+        "click",
+        async () => {
+
+            await addComment(
+                media.id,
+                input.value,
+                null,
+                input,
+                button
+            );
+        }
+    );
+
+
+    input.addEventListener(
+        "keydown",
+        async (event) => {
+
+            if (
+                event.key ===
+                "Enter"
+            ) {
+
+                event.preventDefault();
+
+
+                await addComment(
+                    media.id,
+                    input.value,
+                    null,
+                    input,
+                    button
+                );
+            }
+        }
+    );
+
+
+    inputArea.appendChild(
+        input
+    );
+
+
+    inputArea.appendChild(
+        button
+    );
+
+
+    section.appendChild(
+        inputArea
+    );
+
+
+    return section;
+}
+
+
+/* =========================================
+   COMMENT ELEMENT
+========================================= */
+
+function createCommentElement(
+    comment,
+    allComments,
+    mediaId
+) {
+
+    const container =
+        document.createElement(
+            "div"
+        );
+
+
+    container.className =
+        "comment-container";
+
+
+    const bubble =
+        document.createElement(
+            "div"
+        );
+
+
+    bubble.className =
+        "comment-bubble";
+
+
+    const author =
+        document.createElement(
+            "div"
+        );
+
+
+    author.className =
+        "comment-author";
+
+
+    author.textContent =
+        getCommentAuthor(
+            comment.user_id
+        );
+
+
+    const text =
+        document.createElement(
+            "div"
+        );
+
+
+    text.className =
+        "comment-text";
+
+
+    text.textContent =
+        comment.comment_text;
+
+
+    const meta =
+        document.createElement(
+            "div"
+        );
+
+
+    meta.className =
+        "comment-meta";
+
+
+    const replyButton =
+        document.createElement(
+            "button"
+        );
+
+
+    replyButton.type =
+        "button";
+
+
+    replyButton.className =
+        "reply-button";
+
+
+    replyButton.textContent =
+        "Reply";
+
+
+    meta.appendChild(
+        replyButton
+    );
+
+
+    bubble.appendChild(
+        author
+    );
+
+
+    bubble.appendChild(
+        text
+    );
+
+
+    bubble.appendChild(
+        meta
+    );
+
+
+    container.appendChild(
+        bubble
+    );
+
+
+    /* REPLIES */
+
+    const replies =
+        allComments.filter(
+            (item) =>
+                item.parent_comment_id ===
+                comment.id
+        );
+
+
+    const repliesContainer =
+        document.createElement(
+            "div"
+        );
+
+
+    repliesContainer.className =
+        "replies-container";
+
+
+    replies.forEach(
+        (reply) => {
+
+            repliesContainer.appendChild(
+                createCommentElement(
+                    reply,
+                    allComments,
+                    mediaId
+                )
+            );
+        }
+    );
+
+
+    container.appendChild(
+        repliesContainer
+    );
+
+
+    /* REPLY BUTTON */
+
+    replyButton.addEventListener(
+        "click",
+        () => {
+
+            const existingReplyBox =
+                container.querySelector(
+                    ".reply-input-area"
+                );
+
+
+            if (
+                existingReplyBox
+            ) {
+
+                existingReplyBox.remove();
+
+                return;
+            }
+
+
+            const replyArea =
+                document.createElement(
+                    "div"
+                );
+
+
+            replyArea.className =
+                "reply-input-area";
+
+
+            const input =
+                document.createElement(
+                    "input"
+                );
+
+
+            input.type =
+                "text";
+
+
+            input.className =
+                "comment-input";
+
+
+            input.placeholder =
+                "Write a reply... ❤️";
+
+
+            input.maxLength =
+                500;
+
+
+            const button =
+                document.createElement(
+                    "button"
+                );
+
+
+            button.type =
+                "button";
+
+
+            button.className =
+                "comment-button";
+
+
+            button.textContent =
+                "Reply";
+
+
+            button.addEventListener(
+                "click",
+                async () => {
+
+                    await addComment(
+                        mediaId,
+                        input.value,
+                        comment.id,
+                        input,
+                        button
+                    );
+                }
+            );
+
+
+            input.addEventListener(
+                "keydown",
+                async (event) => {
+
+                    if (
+                        event.key ===
+                        "Enter"
+                    ) {
+
+                        event.preventDefault();
+
+
+                        await addComment(
+                            mediaId,
+                            input.value,
+                            comment.id,
+                            input,
+                            button
+                        );
+                    }
+                }
+            );
+
+
+            replyArea.appendChild(
+                input
+            );
+
+
+            replyArea.appendChild(
+                button
+            );
+
+
+            container.insertBefore(
+                replyArea,
+                repliesContainer
+            );
+
+
+            input.focus();
+        }
+    );
+
+
+    return container;
+}
+
+
+/* =========================================
+   ADD COMMENT
+========================================= */
+
+async function addComment(
+    mediaId,
+    text,
+    parentCommentId,
+    inputElement,
+    buttonElement
+) {
+
+    const commentText =
+        text.trim();
+
+
+    if (!commentText) {
+
+        return;
+    }
+
+
+    if (!currentUser) {
+
+        console.error(
+            "No authenticated user."
+        );
+
+        return;
+    }
+
+
+    buttonElement.disabled =
+        true;
+
+
+    buttonElement.textContent =
+        "Posting...";
+
+
+    try {
+
+        const {
+            error
+        } = await supabaseClient
+            .from("comments")
+            .insert({
+
+                media_id:
+                    mediaId,
+
+                user_id:
+                    currentUser.id,
+
+                comment_text:
+                    commentText,
+
+                parent_comment_id:
+                    parentCommentId ||
+                    null
+
+            });
+
+
+        if (error) {
+
+            throw error;
+        }
+
+
+        inputElement.value =
+            "";
+
+
+        await loadMemories();
+
+
+    } catch (error) {
+
+        console.error(
+            "Comment error:",
+            error
+        );
+
+
+        alert(
+            "Couldn't post the comment."
+        );
+
+
+    } finally {
+
+        buttonElement.disabled =
+            false;
+
+
+        buttonElement.textContent =
+            parentCommentId
+                ? "Reply"
+                : "Post";
+    }
+}
+
+
+/* =========================================
+   COMMENT AUTHOR
+========================================= */
+
+function getCommentAuthor(
+    userId
+) {
+
+    if (
+        currentUser &&
+        userId ===
+            currentUser.id
+    ) {
+
+        return "You";
+    }
+
+
+    return "Your love ❤️";
 }
 
 
@@ -1252,25 +3004,30 @@ function openEditModal(
             "editModal"
         );
 
+
     const titleInput =
         document.getElementById(
             "editMemoryTitle"
         );
+
 
     const dateInput =
         document.getElementById(
             "editMemoryDate"
         );
 
+
     const descriptionInput =
         document.getElementById(
             "editMemoryDescription"
         );
 
+
     const message =
         document.getElementById(
             "editMessage"
         );
+
 
     const saveButton =
         document.getElementById(
@@ -1288,7 +3045,7 @@ function openEditModal(
     ) {
 
         console.error(
-            "Edit modal is missing one or more required elements."
+            "Edit modal is missing required elements."
         );
 
         return;
@@ -1300,15 +3057,18 @@ function openEditModal(
 
 
     titleInput.value =
-        memory.title || "";
+        memory.title ||
+        "";
 
 
     dateInput.value =
-        memory.memory_date || "";
+        memory.memory_date ||
+        "";
 
 
     descriptionInput.value =
-        memory.description || "";
+        memory.description ||
+        "";
 
 
     message.textContent =
@@ -1332,8 +3092,6 @@ function openEditModal(
         "hidden";
 
 
-    /* Put cursor inside title */
-
     titleInput.focus();
 }
 
@@ -1351,6 +3109,7 @@ function closeEditModal() {
 
 
     if (!modal) {
+
         return;
     }
 
@@ -1390,20 +3149,24 @@ async function updateMemory() {
             "editMemoryTitle"
         );
 
+
     const dateInput =
         document.getElementById(
             "editMemoryDate"
         );
+
 
     const descriptionInput =
         document.getElementById(
             "editMemoryDescription"
         );
 
+
     const message =
         document.getElementById(
             "editMessage"
         );
+
 
     const saveButton =
         document.getElementById(
@@ -1411,27 +3174,13 @@ async function updateMemory() {
         );
 
 
-    if (
-        !titleInput ||
-        !dateInput ||
-        !descriptionInput ||
-        !message ||
-        !saveButton
-    ) {
-
-        console.error(
-            "Edit form elements are missing."
-        );
-
-        return;
-    }
-
-
     const title =
         titleInput.value.trim();
 
+
     const date =
         dateInput.value;
+
 
     const description =
         descriptionInput.value.trim();
@@ -1470,13 +3219,16 @@ async function updateMemory() {
         } = await supabaseClient
             .from("memories")
             .update({
+
                 title,
 
                 memory_date:
                     date,
 
                 description:
-                    description || null
+                    description ||
+                    null
+
             })
             .eq(
                 "id",
@@ -1546,6 +3298,7 @@ async function deleteMemory(
 
 
     if (!confirmed) {
+
         return;
     }
 
@@ -1574,7 +3327,7 @@ async function deleteMemory(
         }
 
 
-        /* DELETE STORAGE FILES */
+        /* DELETE STORAGE */
 
         if (
             mediaItems &&
@@ -1605,7 +3358,7 @@ async function deleteMemory(
         }
 
 
-        /* DELETE MEDIA ROWS */
+        /* DELETE MEDIA */
 
         const {
             error: mediaDeleteError
@@ -1678,9 +3431,14 @@ function formatMemoryDate(
     return date.toLocaleDateString(
         "en-IN",
         {
-            day: "numeric",
-            month: "long",
-            year: "numeric"
+            day:
+                "numeric",
+
+            month:
+                "long",
+
+            year:
+                "numeric"
         }
     );
 }
@@ -1695,22 +3453,27 @@ function escapeHtml(
 ) {
 
     return String(value)
+
         .replaceAll(
             "&",
             "&amp;"
         )
+
         .replaceAll(
             "<",
             "&lt;"
         )
+
         .replaceAll(
             ">",
             "&gt;"
         )
+
         .replaceAll(
             '"',
             "&quot;"
         )
+
         .replaceAll(
             "'",
             "&#039;"
@@ -1729,45 +3492,54 @@ function setupEventListeners() {
             "logoutButton"
         );
 
+
     const openUploadButton =
         document.getElementById(
             "openUploadButton"
         );
+
 
     const closeUploadButton =
         document.getElementById(
             "closeUploadButton"
         );
 
+
     const uploadModal =
         document.getElementById(
             "uploadModal"
         );
+
 
     const dropZone =
         document.getElementById(
             "dropZone"
         );
 
+
     const mediaInput =
         document.getElementById(
             "mediaInput"
         );
+
 
     const saveMemoryButton =
         document.getElementById(
             "saveMemoryButton"
         );
 
+
     const closeEditButton =
         document.getElementById(
             "closeEditButton"
         );
 
+
     const saveEditButton =
         document.getElementById(
             "saveEditButton"
         );
+
 
     const editModal =
         document.getElementById(
@@ -1850,6 +3622,7 @@ function setupEventListeners() {
 
                 event.preventDefault();
 
+
                 dropZone.classList.add(
                     "drag-over"
                 );
@@ -1873,6 +3646,7 @@ function setupEventListeners() {
             (event) => {
 
                 event.preventDefault();
+
 
                 dropZone.classList.remove(
                     "drag-over"
@@ -1929,6 +3703,7 @@ function setupEventListeners() {
 
                 event.preventDefault();
 
+
                 closeEditModal();
             }
         );
@@ -1944,6 +3719,7 @@ function setupEventListeners() {
             (event) => {
 
                 event.preventDefault();
+
 
                 updateMemory();
             }
@@ -1986,6 +3762,7 @@ async function initializeApp() {
 
 
     if (!authenticated) {
+
         return;
     }
 
@@ -1996,5 +3773,9 @@ async function initializeApp() {
     await loadMemories();
 }
 
+
+/* =========================================
+   START
+========================================= */
 
 initializeApp();
