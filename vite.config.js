@@ -20,7 +20,11 @@ export default defineConfig({
                 app: resolve(
                     process.cwd(),
                     "app.html"
-                )
+                ),
+                notifications: resolve(
+    process.cwd(),
+    "notifications.html"
+)
             }
         }
     }

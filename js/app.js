@@ -1,8 +1,9 @@
 /* =========================================
-   SUPABASE CLIENT
+   IMPORTS
 ========================================= */
 
 import { FFmpeg } from "@ffmpeg/ffmpeg";
+
 import {
     fetchFile,
     toBlobURL
@@ -11,10 +12,16 @@ import {
 import coreURL from "@ffmpeg/core?url";
 import wasmURL from "@ffmpeg/core/wasm?url";
 
-const supabaseClient = window.supabase.createClient(
-    SUPABASE_URL,
-    SUPABASE_KEY
-);
+
+/* =========================================
+   SUPABASE CLIENT
+========================================= */
+
+const supabaseClient =
+    window.supabase.createClient(
+        SUPABASE_URL,
+        SUPABASE_KEY
+    );
 
 
 /* =========================================
@@ -28,9 +35,8 @@ let selectedFiles = [];
 let currentEditingMemory = null;
 
 let ffmpegInstance = null;
+
 let ffmpegLoadingPromise = null;
-
-
 
 
 /* =========================================
@@ -38,6 +44,7 @@ let ffmpegLoadingPromise = null;
 ========================================= */
 
 const allowedTypes = [
+
     "image/jpeg",
     "image/png",
     "image/webp",
@@ -47,23 +54,17 @@ const allowedTypes = [
     "video/webm",
     "video/quicktime",
     "video/x-matroska"
+
 ];
 
-
-/*
- * Supabase Free upload limit.
- *
- * IMPORTANT:
- * We compress before uploading.
- */
 
 const MAX_UPLOAD_SIZE =
     50 * 1024 * 1024;
 
 
 /*
- * ffmpeg.wasm currently documents
- * a 1 GB maximum input size.
+ * ffmpeg.wasm input ceiling used
+ * by this browser implementation.
  */
 
 const MAX_VIDEO_PROCESSING_SIZE =
@@ -79,7 +80,8 @@ async function checkAuthentication() {
     const {
         data: { session },
         error
-    } = await supabaseClient.auth.getSession();
+    } =
+        await supabaseClient.auth.getSession();
 
 
     if (error) {
@@ -89,8 +91,9 @@ async function checkAuthentication() {
             error
         );
 
-        window.location.href =
-            "login.html";
+        redirectTo(
+            "login.html"
+        );
 
         return false;
     }
@@ -98,8 +101,9 @@ async function checkAuthentication() {
 
     if (!session) {
 
-        window.location.href =
-            "login.html";
+        redirectTo(
+            "login.html"
+        );
 
         return false;
     }
@@ -114,12 +118,30 @@ async function checkAuthentication() {
 
 
 /* =========================================
+   SAFE PAGE REDIRECT
+========================================= */
+
+function redirectTo(
+    page
+) {
+
+    window.location.href =
+        new URL(
+            `./${page}`,
+            window.location.href
+        ).href;
+}
+
+
+/* =========================================
    LOGOUT
 ========================================= */
 
 async function logout() {
 
-    const { error } =
+    const {
+        error
+    } =
         await supabaseClient.auth.signOut();
 
 
@@ -134,8 +156,9 @@ async function logout() {
     }
 
 
-    window.location.href =
-        "login.html";
+    redirectTo(
+        "login.html"
+    );
 }
 
 
@@ -209,30 +232,36 @@ function resetUploadForm() {
             "memoryTitle"
         );
 
+
     const date =
         document.getElementById(
             "memoryDate"
         );
+
 
     const description =
         document.getElementById(
             "memoryDescription"
         );
 
+
     const input =
         document.getElementById(
             "mediaInput"
         );
+
 
     const preview =
         document.getElementById(
             "uploadPreview"
         );
 
+
     const message =
         document.getElementById(
             "uploadMessage"
         );
+
 
     const saveButton =
         document.getElementById(
@@ -333,7 +362,8 @@ function formatFileSize(
     ) {
 
         return `${(
-            bytes / (1024 * 1024)
+            bytes /
+            (1024 * 1024)
         ).toFixed(1)} MB`;
     }
 
@@ -369,19 +399,11 @@ function validateFile(
     }
 
 
-    /* IMAGE */
-
     if (
         file.type.startsWith(
             "image/"
         )
     ) {
-
-        /*
-         * We allow up to 50 MB original
-         * images because the browser will
-         * compress them before uploading.
-         */
 
         if (
             file.size >
@@ -403,8 +425,6 @@ function validateFile(
         };
     }
 
-
-    /* VIDEO */
 
     if (
         file.type.startsWith(
@@ -452,7 +472,7 @@ function addFiles(
 ) {
 
     const incomingFiles =
-        Array.from(files);
+        Array.from(files || []);
 
 
     for (
@@ -512,7 +532,8 @@ function renderPreviews() {
     }
 
 
-    preview.innerHTML = "";
+    preview.innerHTML =
+        "";
 
 
     selectedFiles.forEach(
@@ -533,8 +554,6 @@ function renderPreviews() {
                     file
                 );
 
-
-            /* IMAGE */
 
             if (
                 file.type.startsWith(
@@ -559,9 +578,6 @@ function renderPreviews() {
                 wrapper.appendChild(
                     image
                 );
-
-
-            /* VIDEO */
 
             } else {
 
@@ -589,8 +605,6 @@ function renderPreviews() {
             }
 
 
-            /* TYPE */
-
             const badge =
                 document.createElement(
                     "span"
@@ -613,8 +627,6 @@ function renderPreviews() {
                 badge
             );
 
-
-            /* SIZE */
 
             const size =
                 document.createElement(
@@ -690,15 +702,13 @@ async function compressImage(
 
         width =
             Math.round(
-                width *
-                scale
+                width * scale
             );
 
 
         height =
             Math.round(
-                height *
-                scale
+                height * scale
             );
     }
 
@@ -754,19 +764,13 @@ async function compressImage(
     bitmap.close();
 
 
-    /*
-     * Try WebP first.
-     */
-
     const webpBlob =
         await new Promise(
             (resolve) => {
 
                 canvas.toBlob(
                     resolve,
-
                     "image/webp",
-
                     0.72
                 );
             }
@@ -781,11 +785,6 @@ async function compressImage(
     }
 
 
-    /*
-     * If WebP is larger than the original,
-     * try JPEG.
-     */
-
     if (
         webpBlob.size >=
         file.size
@@ -797,9 +796,7 @@ async function compressImage(
 
                     canvas.toBlob(
                         resolve,
-
                         "image/jpeg",
-
                         0.70
                     );
                 }
@@ -813,9 +810,7 @@ async function compressImage(
         ) {
 
             return new File(
-                [
-                    jpegBlob
-                ],
+                [jpegBlob],
 
                 replaceExtension(
                     file.name,
@@ -835,9 +830,7 @@ async function compressImage(
 
 
     return new File(
-        [
-            webpBlob
-        ],
+        [webpBlob],
 
         replaceExtension(
             file.name,
@@ -896,11 +889,13 @@ async function loadFFmpeg(
 ) {
 
     if (ffmpegInstance) {
+
         return ffmpegInstance;
     }
 
 
     if (ffmpegLoadingPromise) {
+
         return ffmpegLoadingPromise;
     }
 
@@ -951,14 +946,6 @@ async function loadFFmpeg(
             );
 
 
-            /*
-             * Vite gives us the real URLs for
-             * ffmpeg-core.js and ffmpeg-core.wasm.
-             *
-             * toBlobURL avoids worker/module loading
-             * problems caused by the original URLs.
-             */
-
             await ffmpeg.load({
 
                 coreURL:
@@ -1007,6 +994,7 @@ async function loadFFmpeg(
         ffmpegLoadingPromise =
             null;
 
+
         ffmpegInstance =
             null;
 
@@ -1015,67 +1003,43 @@ async function loadFFmpeg(
     }
 }
 
-/* =========================================
-   CONVERT FILE TO UINT8ARRAY
-========================================= */
-
-async function fileToUint8Array(
-    file
-) {
-
-    const buffer =
-        await file.arrayBuffer();
-
-
-    return new Uint8Array(
-        buffer
-    );
-}
-
 
 /* =========================================
-   SAFE FFMPEG DELETE
+   VIDEO EXTENSION
 ========================================= */
 
-async function cleanupFFmpegFile(
-    ffmpeg,
-    fileName
+function getVideoExtension(
+    mimeType
 ) {
 
-    try {
+    if (
+        mimeType ===
+        "video/webm"
+    ) {
 
-        if (
-            ffmpeg.fs &&
-            typeof ffmpeg.fs.unlink ===
-                "function"
-        ) {
-
-            ffmpeg.fs.unlink(
-                fileName
-            );
-
-
-            return;
-        }
-
-
-        if (
-            typeof ffmpeg.deleteFile ===
-                "function"
-        ) {
-
-            await ffmpeg.deleteFile(
-                fileName
-            );
-        }
-
-    } catch (error) {
-
-        console.warn(
-            `Could not clean up ${fileName}:`,
-            error
-        );
+        return "webm";
     }
+
+
+    if (
+        mimeType ===
+        "video/quicktime"
+    ) {
+
+        return "mov";
+    }
+
+
+    if (
+        mimeType ===
+        "video/x-matroska"
+    ) {
+
+        return "mkv";
+    }
+
+
+    return "mp4";
 }
 
 
@@ -1088,15 +1052,9 @@ async function compressVideo(
     statusCallback
 ) {
 
-    const MAX_VIDEO_SIZE =
-        1024 *
-        1024 *
-        1024;
-
-
     if (
         file.size >
-        MAX_VIDEO_SIZE
+        MAX_VIDEO_PROCESSING_SIZE
     ) {
 
         throw new Error(
@@ -1112,7 +1070,9 @@ async function compressVideo(
 
 
     const inputName =
-        "input.mp4";
+        `input.${getVideoExtension(
+            file.type
+        )}`;
 
 
     const outputName =
@@ -1173,6 +1133,7 @@ async function compressVideo(
             "+faststart",
 
             outputName
+
         ]);
 
 
@@ -1189,7 +1150,10 @@ async function compressVideo(
 
         const optimizedBlob =
             new Blob(
-                [outputData],
+                [
+                    outputData
+                ],
+
                 {
                     type:
                         "video/mp4"
@@ -1218,12 +1182,14 @@ async function compressVideo(
             );
 
 
-        await ffmpeg.deleteFile(
+        await cleanupFFmpegFile(
+            ffmpeg,
             inputName
         );
 
 
-        await ffmpeg.deleteFile(
+        await cleanupFFmpegFile(
+            ffmpeg,
             outputName
         );
 
@@ -1233,22 +1199,16 @@ async function compressVideo(
 
     } catch (error) {
 
-        try {
-
-            await ffmpeg.deleteFile(
-                inputName
-            );
-
-        } catch (_) {}
+        await cleanupFFmpegFile(
+            ffmpeg,
+            inputName
+        );
 
 
-        try {
-
-            await ffmpeg.deleteFile(
-                outputName
-            );
-
-        } catch (_) {}
+        await cleanupFFmpegFile(
+            ffmpeg,
+            outputName
+        );
 
 
         throw error;
@@ -1257,41 +1217,47 @@ async function compressVideo(
 
 
 /* =========================================
-   VIDEO EXTENSION
+   SAFE FFMPEG CLEANUP
 ========================================= */
 
-function getVideoExtension(
-    mimeType
+async function cleanupFFmpegFile(
+    ffmpeg,
+    fileName
 ) {
 
-    if (
-        mimeType ===
-        "video/webm"
-    ) {
+    try {
 
-        return "webm";
+        if (
+            typeof ffmpeg.deleteFile ===
+            "function"
+        ) {
+
+            await ffmpeg.deleteFile(
+                fileName
+            );
+
+            return;
+        }
+
+
+        if (
+            ffmpeg.fs &&
+            typeof ffmpeg.fs.unlink ===
+                "function"
+        ) {
+
+            ffmpeg.fs.unlink(
+                fileName
+            );
+        }
+
+    } catch (error) {
+
+        console.warn(
+            `FFmpeg cleanup failed for ${fileName}:`,
+            error
+        );
     }
-
-
-    if (
-        mimeType ===
-        "video/quicktime"
-    ) {
-
-        return "mov";
-    }
-
-
-    if (
-        mimeType ===
-        "video/x-matroska"
-    ) {
-
-        return "mkv";
-    }
-
-
-    return "mp4";
 }
 
 
@@ -1322,7 +1288,11 @@ async function optimizeMedia(
 
 
         statusCallback(
-            `Photo optimized: ${formatFileSize(file.size)} → ${formatFileSize(optimized.size)}`
+            `Photo optimized: ${formatFileSize(
+                file.size
+            )} → ${formatFileSize(
+                optimized.size
+            )}`
         );
 
 
@@ -1344,7 +1314,11 @@ async function optimizeMedia(
 
 
         statusCallback(
-            `Video optimized: ${formatFileSize(file.size)} → ${formatFileSize(optimized.size)}`
+            `Video optimized: ${formatFileSize(
+                file.size
+            )} → ${formatFileSize(
+                optimized.size
+            )}`
         );
 
 
@@ -1369,20 +1343,24 @@ async function createMemory() {
             "memoryTitle"
         );
 
+
     const dateInput =
         document.getElementById(
             "memoryDate"
         );
+
 
     const descriptionInput =
         document.getElementById(
             "memoryDescription"
         );
 
+
     const saveButton =
         document.getElementById(
             "saveMemoryButton"
         );
+
 
     const message =
         document.getElementById(
@@ -1462,10 +1440,6 @@ async function createMemory() {
 
     try {
 
-        /* =====================================
-           CREATE MEMORY
-        ===================================== */
-
         message.textContent =
             "Creating your memory... ❤️";
 
@@ -1473,25 +1447,26 @@ async function createMemory() {
         const {
             data: memory,
             error: memoryError
-        } = await supabaseClient
-            .from("memories")
-            .insert({
+        } =
+            await supabaseClient
+                .from("memories")
+                .insert({
 
-                title,
+                    title,
 
-                description:
-                    description ||
-                    null,
+                    description:
+                        description ||
+                        null,
 
-                memory_date:
-                    date,
+                    memory_date:
+                        date,
 
-                created_by:
-                    currentUser.id
+                    created_by:
+                        currentUser.id
 
-            })
-            .select()
-            .single();
+                })
+                .select()
+                .single();
 
 
         if (memoryError) {
@@ -1500,13 +1475,10 @@ async function createMemory() {
         }
 
 
-        /* =====================================
-           PROCESS EACH FILE
-        ===================================== */
-
         for (
             let index = 0;
-            index < selectedFiles.length;
+            index <
+                selectedFiles.length;
             index++
         ) {
 
@@ -1518,11 +1490,11 @@ async function createMemory() {
                 index + 1;
 
 
+            let optimizedFile;
+
+
             message.textContent =
                 `Optimizing ${position} of ${selectedFiles.length}... ❤️`;
-
-
-            let optimizedFile;
 
 
             try {
@@ -1530,7 +1502,6 @@ async function createMemory() {
                 optimizedFile =
                     await optimizeMedia(
                         originalFile,
-
                         (status) => {
 
                             message.textContent =
@@ -1552,17 +1523,15 @@ async function createMemory() {
             }
 
 
-            /*
-             * Final Supabase size check.
-             */
-
             if (
                 optimizedFile.size >
                 MAX_UPLOAD_SIZE
             ) {
 
                 throw new Error(
-                    `${originalFile.name} is still ${formatFileSize(optimizedFile.size)} after optimization, which is above the 50 MB upload limit.`
+                    `${originalFile.name} is still ${formatFileSize(
+                        optimizedFile.size
+                    )} after optimization, which is above the 50 MB upload limit.`
                 );
             }
 
@@ -1596,25 +1565,26 @@ async function createMemory() {
 
             const {
                 error: uploadError
-            } = await supabaseClient
-                .storage
-                .from("memory-media")
-                .upload(
-                    filePath,
-                    optimizedFile,
-                    {
+            } =
+                await supabaseClient
+                    .storage
+                    .from("memory-media")
+                    .upload(
+                        filePath,
+                        optimizedFile,
+                        {
 
-                        contentType:
-                            optimizedFile.type,
+                            contentType:
+                                optimizedFile.type,
 
-                        cacheControl:
-                            "31536000",
+                            cacheControl:
+                                "31536000",
 
-                        upsert:
-                            false
+                            upsert:
+                                false
 
-                    }
-                );
+                        }
+                    );
 
 
             if (uploadError) {
@@ -1623,36 +1593,33 @@ async function createMemory() {
             }
 
 
-            /* =================================
-               SAVE MEDIA RECORD
-            ================================= */
-
             const {
                 error: mediaError
-            } = await supabaseClient
-                .from("media")
-                .insert({
+            } =
+                await supabaseClient
+                    .from("media")
+                    .insert({
 
-                    memory_id:
-                        memory.id,
+                        memory_id:
+                            memory.id,
 
-                    file_name:
-                        optimizedFile.name,
+                        file_name:
+                            optimizedFile.name,
 
-                    file_path:
-                        filePath,
+                        file_path:
+                            filePath,
 
-                    media_type:
-                        optimizedFile.type.startsWith(
-                            "video/"
-                        )
-                            ? "video"
-                            : "image",
+                        media_type:
+                            optimizedFile.type.startsWith(
+                                "video/"
+                            )
+                                ? "video"
+                                : "image",
 
-                    created_by:
-                        currentUser.id
+                        created_by:
+                            currentUser.id
 
-                });
+                    });
 
 
             if (mediaError) {
@@ -1664,16 +1631,16 @@ async function createMemory() {
             console.log(
                 `Optimized:
 ${originalFile.name}
-${formatFileSize(originalFile.size)}
+${formatFileSize(
+    originalFile.size
+)}
 →
-${formatFileSize(optimizedFile.size)}`
+${formatFileSize(
+    optimizedFile.size
+)}`
             );
         }
 
-
-        /* =====================================
-           SUCCESS
-        ===================================== */
 
         message.textContent =
             "Memory saved ❤️";
@@ -1718,6 +1685,30 @@ ${formatFileSize(optimizedFile.size)}`
 
 
 /* =========================================
+   SEARCH ESCAPING
+========================================= */
+
+function escapeIlikePattern(
+    value
+) {
+
+    return String(value)
+        .replaceAll(
+            "\\",
+            "\\\\"
+        )
+        .replaceAll(
+            "%",
+            "\\%"
+        )
+        .replaceAll(
+            "_",
+            "\\_"
+        );
+}
+
+
+/* =========================================
    LOAD MEMORIES
 ========================================= */
 
@@ -1750,34 +1741,67 @@ async function loadMemories() {
     `;
 
 
+    const searchInput =
+        document.getElementById(
+            "memorySearchInput"
+        );
+
+
+    const searchTerm =
+        searchInput
+            ? searchInput.value.trim()
+            : "";
+
+
+    let memoryQuery =
+        supabaseClient
+            .from("memories")
+            .select(`
+                id,
+                title,
+                description,
+                memory_date,
+                created_by,
+                created_at,
+                media (
+                    id,
+                    file_name,
+                    file_path,
+                    media_type,
+                    created_by,
+                    created_at
+                )
+            `);
+
+
+    if (searchTerm) {
+
+        const escapedSearch =
+            escapeIlikePattern(
+                searchTerm
+            );
+
+
+        memoryQuery =
+            memoryQuery.ilike(
+                "title",
+                `%${escapedSearch}%`
+            );
+    }
+
+
     const {
         data: memories,
         error: memoriesError
-    } = await supabaseClient
-        .from("memories")
-        .select(`
-            id,
-            title,
-            description,
-            memory_date,
-            created_by,
-            created_at,
-            media (
-                id,
-                file_name,
-                file_path,
-                media_type,
-                created_by,
-                created_at
-            )
-        `)
-        .order(
-            "memory_date",
-            {
-                ascending:
-                    false
-            }
-        );
+    } =
+        await memoryQuery
+            .order(
+                "memory_date",
+                {
+                    ascending:
+                        false
+                }
+            );
 
 
     if (memoriesError) {
@@ -1816,23 +1840,50 @@ async function loadMemories() {
         memories.length === 0
     ) {
 
-        timeline.innerHTML = `
-            <div class="empty-state">
+        if (searchTerm) {
 
-                <div class="empty-heart">
-                    ❤️
+            timeline.innerHTML = `
+                <div class="empty-state">
+
+                    <div class="empty-heart">
+                        🔍
+                    </div>
+
+                    <h2>
+                        No memories found.
+                    </h2>
+
+                    <p>
+                        Nothing matches
+                        "<strong>${escapeHtml(
+                            searchTerm
+                        )}</strong>"
+                        in the title.
+                    </p>
+
                 </div>
+            `;
 
-                <h2>
-                    Our story starts here.
-                </h2>
+        } else {
 
-                <p>
-                    Add your first memory together.
-                </p>
+            timeline.innerHTML = `
+                <div class="empty-state">
 
-            </div>
-        `;
+                    <div class="empty-heart">
+                        ❤️
+                    </div>
+
+                    <h2>
+                        Our story starts here.
+                    </h2>
+
+                    <p>
+                        Add your first memory together.
+                    </p>
+
+                </div>
+            `;
+        }
 
 
         return;
@@ -1840,10 +1891,14 @@ async function loadMemories() {
 
 
     /* =====================================
-       LOAD COMMENTS SEPARATELY
+       LOAD COMMENTS FOR MEMORIES
     ===================================== */
 
-    const mediaIds = [];
+    const memoryIds =
+        memories.map(
+            (memory) =>
+                memory.id
+        );
 
 
     memories.forEach(
@@ -1852,43 +1907,29 @@ async function loadMemories() {
             memory.media =
                 memory.media || [];
 
-
-            memory.media.forEach(
-                (media) => {
-
-                    media.comments =
-                        [];
-
-
-                    mediaIds.push(
-                        media.id
-                    );
-                }
-            );
+            memory.comments =
+                [];
         }
     );
 
 
-    if (
-        mediaIds.length > 0
-    ) {
-
-        const {
-            data: comments,
-            error: commentsError
-        } = await supabaseClient
+    const {
+        data: comments,
+        error: commentsError
+    } =
+        await supabaseClient
             .from("comments")
             .select(`
                 id,
-                media_id,
+                memory_id,
                 user_id,
                 comment_text,
                 parent_comment_id,
                 created_at
             `)
             .in(
-                "media_id",
-                mediaIds
+                "memory_id",
+                memoryIds
             )
             .order(
                 "created_at",
@@ -1899,41 +1940,35 @@ async function loadMemories() {
             );
 
 
-        if (commentsError) {
+    if (commentsError) {
 
-            console.warn(
-                "Comments could not be loaded. Memories will still be displayed:",
-                commentsError
-            );
+        console.warn(
+            "Comments could not be loaded. Memories will still be displayed:",
+            commentsError
+        );
 
-        } else {
+    } else {
 
-            const allComments =
-                comments || [];
+        const allComments =
+            comments || [];
 
 
-            memories.forEach(
-                (memory) => {
+        memories.forEach(
+            (memory) => {
 
-                    memory.media.forEach(
-                        (media) => {
-
-                            media.comments =
-                                allComments.filter(
-                                    (comment) =>
-                                        comment.media_id ===
-                                        media.id
-                                );
-                        }
+                memory.comments =
+                    allComments.filter(
+                        (comment) =>
+                            comment.memory_id ===
+                            memory.id
                     );
-                }
-            );
-        }
+            }
+        );
     }
 
 
     /* =====================================
-       RENDER TIMELINE
+       RENDER
     ===================================== */
 
     timeline.innerHTML =
@@ -1954,6 +1989,74 @@ async function loadMemories() {
             element
         );
     }
+
+
+    focusMemoryFromHash();
+}
+
+
+/* =========================================
+   FOCUS MEMORY FROM URL HASH
+========================================= */
+
+function focusMemoryFromHash() {
+
+    const hash =
+        window.location.hash;
+
+
+    if (
+        !hash.startsWith(
+            "#memory-"
+        )
+    ) {
+
+        return;
+    }
+
+
+    const target =
+        document.getElementById(
+            hash.substring(1)
+        );
+
+
+    if (!target) {
+
+        return;
+    }
+
+
+    setTimeout(
+        () => {
+
+            target.scrollIntoView({
+                behavior:
+                    "smooth",
+                block:
+                    "center"
+            });
+
+
+            target.classList.add(
+                "memory-highlight"
+            );
+
+
+            setTimeout(
+                () => {
+
+                    target.classList.remove(
+                        "memory-highlight"
+                    );
+
+                },
+                1800
+            );
+
+        },
+        100
+    );
 }
 
 
@@ -1968,13 +2071,14 @@ async function getSignedMediaUrl(
     const {
         data,
         error
-    } = await supabaseClient
-        .storage
-        .from("memory-media")
-        .createSignedUrl(
-            filePath,
-            60 * 60 * 24
-        );
+    } =
+        await supabaseClient
+            .storage
+            .from("memory-media")
+            .createSignedUrl(
+                filePath,
+                60 * 60 * 24
+            );
 
 
     if (error) {
@@ -2008,11 +2112,17 @@ async function createMemoryElement(
         );
 
 
+    article.id =
+        `memory-${memory.id}`;
+
+
     article.className =
         "memory-card";
 
 
-    /* HEADER */
+    /* =====================================
+       HEADER
+    ===================================== */
 
     const header =
         document.createElement(
@@ -2045,7 +2155,9 @@ async function createMemoryElement(
     `;
 
 
-    /* ACTIONS */
+    /* =====================================
+       ACTIONS
+    ===================================== */
 
     const actions =
         document.createElement(
@@ -2118,7 +2230,9 @@ async function createMemoryElement(
     );
 
 
-    /* DESCRIPTION */
+    /* =====================================
+       DESCRIPTION
+    ===================================== */
 
     if (
         memory.description
@@ -2144,7 +2258,9 @@ async function createMemoryElement(
     }
 
 
-    /* MEDIA */
+    /* =====================================
+       MEDIA
+    ===================================== */
 
     const mediaItems =
         memory.media || [];
@@ -2204,7 +2320,9 @@ async function createMemoryElement(
     }
 
 
-    /* AUTHOR */
+    /* =====================================
+       AUTHOR
+    ===================================== */
 
     const author =
         document.createElement(
@@ -2225,7 +2343,24 @@ async function createMemoryElement(
     );
 
 
-    /* EDIT */
+    /* =====================================
+       MEMORY COMMENTS
+    ===================================== */
+
+    const commentsSection =
+        createCommentsSection(
+            memory
+        );
+
+
+    article.appendChild(
+        commentsSection
+    );
+
+
+    /* =====================================
+       EDIT
+    ===================================== */
 
     editButton.addEventListener(
         "click",
@@ -2242,7 +2377,9 @@ async function createMemoryElement(
     );
 
 
-    /* DELETE */
+    /* =====================================
+       DELETE
+    ===================================== */
 
     deleteButton.addEventListener(
         "click",
@@ -2292,8 +2429,6 @@ function createMediaElement(
         "media-item";
 
 
-    /* IMAGE */
-
     if (
         media.media_type ===
         "image"
@@ -2321,8 +2456,6 @@ function createMediaElement(
             image
         );
 
-
-    /* VIDEO */
 
     } else if (
         media.media_type ===
@@ -2367,19 +2500,6 @@ function createMediaElement(
     );
 
 
-    /* COMMENTS */
-
-    const commentsSection =
-        createCommentsSection(
-            media
-        );
-
-
-    wrapper.appendChild(
-        commentsSection
-    );
-
-
     return wrapper;
 }
 
@@ -2389,7 +2509,7 @@ function createMediaElement(
 ========================================= */
 
 function createCommentsSection(
-    media
+    memory
 ) {
 
     const section =
@@ -2403,10 +2523,12 @@ function createCommentsSection(
 
 
     const comments =
-        media.comments || [];
+        memory.comments || [];
 
 
-    /* HEADER */
+    /* =====================================
+       HEADER
+    ===================================== */
 
     const header =
         document.createElement(
@@ -2429,7 +2551,9 @@ function createCommentsSection(
     );
 
 
-    /* COMMENT LIST */
+    /* =====================================
+       LIST
+    ===================================== */
 
     const commentsList =
         document.createElement(
@@ -2455,7 +2579,7 @@ function createCommentsSection(
                 createCommentElement(
                     comment,
                     comments,
-                    media.id
+                    memory.id
                 )
             );
         }
@@ -2467,7 +2591,9 @@ function createCommentsSection(
     );
 
 
-    /* NEW COMMENT */
+    /* =====================================
+       NEW COMMENT
+    ===================================== */
 
     const inputArea =
         document.createElement(
@@ -2524,7 +2650,7 @@ function createCommentsSection(
         async () => {
 
             await addComment(
-                media.id,
+                memory.id,
                 input.value,
                 null,
                 input,
@@ -2547,7 +2673,7 @@ function createCommentsSection(
 
 
                 await addComment(
-                    media.id,
+                    memory.id,
                     input.value,
                     null,
                     input,
@@ -2584,7 +2710,7 @@ function createCommentsSection(
 function createCommentElement(
     comment,
     allComments,
-    mediaId
+    memoryId
 ) {
 
     const container =
@@ -2607,6 +2733,20 @@ function createCommentElement(
         "comment-bubble";
 
 
+    /* =====================================
+       HEADER
+    ===================================== */
+
+    const header =
+        document.createElement(
+            "div"
+        );
+
+
+    header.className =
+        "comment-header";
+
+
     const author =
         document.createElement(
             "div"
@@ -2623,28 +2763,103 @@ function createCommentElement(
         );
 
 
-    const text =
+    header.appendChild(
+        author
+    );
+
+
+    /* =====================================
+       ACTIONS
+    ===================================== */
+
+    const actions =
         document.createElement(
             "div"
         );
 
 
-    text.className =
-        "comment-text";
+    actions.className =
+        "comment-actions";
 
 
-    text.textContent =
-        comment.comment_text;
-
-
-    const meta =
-        document.createElement(
-            "div"
+    const isOwner =
+        Boolean(
+            currentUser &&
+            comment.user_id ===
+                currentUser.id
         );
 
 
-    meta.className =
-        "comment-meta";
+    if (isOwner) {
+
+        const editButton =
+            document.createElement(
+                "button"
+            );
+
+
+        editButton.type =
+            "button";
+
+
+        editButton.className =
+            "comment-action-button edit-comment-button";
+
+
+        editButton.textContent =
+            "Edit";
+
+
+        editButton.addEventListener(
+            "click",
+            () => {
+
+                startEditComment(
+                    comment,
+                    bubble
+                );
+            }
+        );
+
+
+        const deleteButton =
+            document.createElement(
+                "button"
+            );
+
+
+        deleteButton.type =
+            "button";
+
+
+        deleteButton.className =
+            "comment-action-button delete-comment-button";
+
+
+        deleteButton.textContent =
+            "Delete";
+
+
+        deleteButton.addEventListener(
+            "click",
+            async () => {
+
+                await deleteComment(
+                    comment.id
+                );
+            }
+        );
+
+
+        actions.appendChild(
+            editButton
+        );
+
+
+        actions.appendChild(
+            deleteButton
+        );
+    }
 
 
     const replyButton =
@@ -2665,23 +2880,41 @@ function createCommentElement(
         "Reply";
 
 
-    meta.appendChild(
+    actions.appendChild(
         replyButton
     );
 
 
-    bubble.appendChild(
-        author
+    header.appendChild(
+        actions
     );
+
+
+    bubble.appendChild(
+        header
+    );
+
+
+    /* =====================================
+       COMMENT TEXT
+    ===================================== */
+
+    const text =
+        document.createElement(
+            "div"
+        );
+
+
+    text.className =
+        "comment-text";
+
+
+    text.textContent =
+        comment.comment_text;
 
 
     bubble.appendChild(
         text
-    );
-
-
-    bubble.appendChild(
-        meta
     );
 
 
@@ -2690,7 +2923,9 @@ function createCommentElement(
     );
 
 
-    /* REPLIES */
+    /* =====================================
+       REPLIES
+    ===================================== */
 
     const replies =
         allComments.filter(
@@ -2717,7 +2952,7 @@ function createCommentElement(
                 createCommentElement(
                     reply,
                     allComments,
-                    mediaId
+                    memoryId
                 )
             );
         }
@@ -2729,7 +2964,9 @@ function createCommentElement(
     );
 
 
-    /* REPLY BUTTON */
+    /* =====================================
+       REPLY INPUT
+    ===================================== */
 
     replyButton.addEventListener(
         "click",
@@ -2806,7 +3043,7 @@ function createCommentElement(
                 async () => {
 
                     await addComment(
-                        mediaId,
+                        memoryId,
                         input.value,
                         comment.id,
                         input,
@@ -2829,7 +3066,7 @@ function createCommentElement(
 
 
                         await addComment(
-                            mediaId,
+                            memoryId,
                             input.value,
                             comment.id,
                             input,
@@ -2866,11 +3103,331 @@ function createCommentElement(
 
 
 /* =========================================
-   ADD COMMENT
+   EDIT COMMENT
+========================================= */
+
+async function startEditComment(
+    comment,
+    bubble
+) {
+
+    if (
+        bubble.querySelector(
+            ".edit-comment-area"
+        )
+    ) {
+
+        return;
+    }
+
+
+    const existingText =
+        bubble.querySelector(
+            ".comment-text"
+        );
+
+
+    if (!existingText) {
+
+        return;
+    }
+
+
+    existingText.style.display =
+        "none";
+
+
+    const editArea =
+        document.createElement(
+            "div"
+        );
+
+
+    editArea.className =
+        "edit-comment-area";
+
+
+    const input =
+        document.createElement(
+            "textarea"
+        );
+
+
+    input.className =
+        "comment-edit-input";
+
+
+    input.value =
+        comment.comment_text;
+
+
+    input.maxLength =
+        500;
+
+
+    const controls =
+        document.createElement(
+            "div"
+        );
+
+
+    controls.className =
+        "comment-edit-controls";
+
+
+    const saveButton =
+        document.createElement(
+            "button"
+        );
+
+
+    saveButton.type =
+        "button";
+
+
+    saveButton.className =
+        "comment-button";
+
+
+    saveButton.textContent =
+        "Save";
+
+
+    const cancelButton =
+        document.createElement(
+            "button"
+        );
+
+
+    cancelButton.type =
+        "button";
+
+
+    cancelButton.className =
+        "comment-action-button";
+
+
+    cancelButton.textContent =
+        "Cancel";
+
+
+    controls.appendChild(
+        saveButton
+    );
+
+
+    controls.appendChild(
+        cancelButton
+    );
+
+
+    editArea.appendChild(
+        input
+    );
+
+
+    editArea.appendChild(
+        controls
+    );
+
+
+    existingText.after(
+        editArea
+    );
+
+
+    input.focus();
+
+
+    input.setSelectionRange(
+        input.value.length,
+        input.value.length
+    );
+
+
+    cancelButton.addEventListener(
+        "click",
+        () => {
+
+            editArea.remove();
+
+            existingText.style.display =
+                "";
+        }
+    );
+
+
+    saveButton.addEventListener(
+        "click",
+        async () => {
+
+            const newText =
+                input.value.trim();
+
+
+            if (!newText) {
+
+                alert(
+                    "Comment cannot be empty."
+                );
+
+                input.focus();
+
+                return;
+            }
+
+
+            if (
+                newText ===
+                comment.comment_text
+            ) {
+
+                editArea.remove();
+
+                existingText.style.display =
+                    "";
+
+                return;
+            }
+
+
+            saveButton.disabled =
+                true;
+
+
+            saveButton.textContent =
+                "Saving...";
+
+
+            try {
+
+                let query =
+                    supabaseClient
+                        .from("comments")
+                        .update({
+
+                            comment_text:
+                                newText
+
+                        })
+                        .eq(
+                            "id",
+                            comment.id
+                        )
+                        .eq(
+                            "user_id",
+                            currentUser.id
+                        );
+
+
+                const {
+                    error
+                } =
+                    await query;
+
+
+                if (error) {
+
+                    throw error;
+                }
+
+
+                await loadMemories();
+
+
+            } catch (error) {
+
+                console.error(
+                    "Edit comment error:",
+                    error
+                );
+
+
+                alert(
+                    "Couldn't update the comment."
+                );
+
+
+                saveButton.disabled =
+                    false;
+
+
+                saveButton.textContent =
+                    "Save";
+            }
+        }
+    );
+}
+
+
+/* =========================================
+   DELETE COMMENT
+========================================= */
+
+async function deleteComment(
+    commentId
+) {
+
+    const confirmed =
+        window.confirm(
+            "Delete this comment?"
+        );
+
+
+    if (!confirmed) {
+
+        return;
+    }
+
+
+    try {
+
+        const {
+            error
+        } =
+            await supabaseClient
+                .from("comments")
+                .delete()
+                .eq(
+                    "id",
+                    commentId
+                )
+                .eq(
+                    "user_id",
+                    currentUser.id
+                );
+
+
+        if (error) {
+
+            throw error;
+        }
+
+
+        await loadMemories();
+
+
+    } catch (error) {
+
+        console.error(
+            "Delete comment error:",
+            error
+        );
+
+
+        alert(
+            "Couldn't delete the comment."
+        );
+    }
+}
+
+
+/* =========================================
+   ADD COMMENT / REPLY
 ========================================= */
 
 async function addComment(
-    mediaId,
+    memoryId,
     text,
     parentCommentId,
     inputElement,
@@ -2878,7 +3435,9 @@ async function addComment(
 ) {
 
     const commentText =
-        text.trim();
+        String(
+            text || ""
+        ).trim();
 
 
     if (!commentText) {
@@ -2902,31 +3461,34 @@ async function addComment(
 
 
     buttonElement.textContent =
-        "Posting...";
+        parentCommentId
+            ? "Replying..."
+            : "Posting...";
 
 
     try {
 
         const {
             error
-        } = await supabaseClient
-            .from("comments")
-            .insert({
+        } =
+            await supabaseClient
+                .from("comments")
+                .insert({
 
-                media_id:
-                    mediaId,
+                    memory_id:
+                        memoryId,
 
-                user_id:
-                    currentUser.id,
+                    user_id:
+                        currentUser.id,
 
-                comment_text:
-                    commentText,
+                    comment_text:
+                        commentText,
 
-                parent_comment_id:
-                    parentCommentId ||
-                    null
+                    parent_comment_id:
+                        parentCommentId ||
+                        null
 
-            });
+                });
 
 
         if (error) {
@@ -2953,7 +3515,6 @@ async function addComment(
         alert(
             "Couldn't post the comment."
         );
-
 
     } finally {
 
@@ -2992,7 +3553,7 @@ function getCommentAuthor(
 
 
 /* =========================================
-   EDIT MODAL
+   EDIT MEMORY MODAL
 ========================================= */
 
 function openEditModal(
@@ -3174,6 +3735,18 @@ async function updateMemory() {
         );
 
 
+    if (
+        !titleInput ||
+        !dateInput ||
+        !descriptionInput ||
+        !message ||
+        !saveButton
+    ) {
+
+        return;
+    }
+
+
     const title =
         titleInput.value.trim();
 
@@ -3216,24 +3789,25 @@ async function updateMemory() {
 
         const {
             error
-        } = await supabaseClient
-            .from("memories")
-            .update({
+        } =
+            await supabaseClient
+                .from("memories")
+                .update({
 
-                title,
+                    title,
 
-                memory_date:
-                    date,
+                    memory_date:
+                        date,
 
-                description:
-                    description ||
-                    null
+                    description:
+                        description ||
+                        null
 
-            })
-            .eq(
-                "id",
-                currentEditingMemory.id
-            );
+                })
+                .eq(
+                    "id",
+                    currentEditingMemory.id
+                );
 
 
         if (error) {
@@ -3305,20 +3879,19 @@ async function deleteMemory(
 
     try {
 
-        /* GET MEDIA */
-
         const {
             data: mediaItems,
             error: fetchError
-        } = await supabaseClient
-            .from("media")
-            .select(
-                "file_path"
-            )
-            .eq(
-                "memory_id",
-                memory.id
-            );
+        } =
+            await supabaseClient
+                .from("media")
+                .select(
+                    "file_path"
+                )
+                .eq(
+                    "memory_id",
+                    memory.id
+                );
 
 
         if (fetchError) {
@@ -3326,8 +3899,6 @@ async function deleteMemory(
             throw fetchError;
         }
 
-
-        /* DELETE STORAGE */
 
         if (
             mediaItems &&
@@ -3342,13 +3913,15 @@ async function deleteMemory(
 
 
             const {
-                error: storageError
-            } = await supabaseClient
-                .storage
-                .from("memory-media")
-                .remove(
-                    paths
-                );
+                error:
+                    storageError
+            } =
+                await supabaseClient
+                    .storage
+                    .from("memory-media")
+                    .remove(
+                        paths
+                    );
 
 
             if (storageError) {
@@ -3358,17 +3931,47 @@ async function deleteMemory(
         }
 
 
-        /* DELETE MEDIA */
+        /*
+         * Delete comments associated
+         * with this memory first.
+         *
+         * This is intentionally explicit
+         * because the comments table uses
+         * memory_id.
+         */
 
         const {
-            error: mediaDeleteError
-        } = await supabaseClient
-            .from("media")
-            .delete()
-            .eq(
-                "memory_id",
-                memory.id
-            );
+            error:
+                commentsDeleteError
+        } =
+            await supabaseClient
+                .from("comments")
+                .delete()
+                .eq(
+                    "memory_id",
+                    memory.id
+                );
+
+
+        if (
+            commentsDeleteError
+        ) {
+
+            throw commentsDeleteError;
+        }
+
+
+        const {
+            error:
+                mediaDeleteError
+        } =
+            await supabaseClient
+                .from("media")
+                .delete()
+                .eq(
+                    "memory_id",
+                    memory.id
+                );
 
 
         if (mediaDeleteError) {
@@ -3377,17 +3980,17 @@ async function deleteMemory(
         }
 
 
-        /* DELETE MEMORY */
-
         const {
-            error: memoryDeleteError
-        } = await supabaseClient
-            .from("memories")
-            .delete()
-            .eq(
-                "id",
-                memory.id
-            );
+            error:
+                memoryDeleteError
+        } =
+            await supabaseClient
+                .from("memories")
+                .delete()
+                .eq(
+                    "id",
+                    memory.id
+                );
 
 
         if (memoryDeleteError) {
@@ -3487,67 +4090,112 @@ function escapeHtml(
 
 function setupEventListeners() {
 
+    const memorySearchInput =
+        document.getElementById(
+            "memorySearchInput"
+        );
+
+
+    const clearSearchButton =
+        document.getElementById(
+            "clearSearchButton"
+        );
+
+
+    let searchTimeout =
+        null;
+
+
+    /* =====================================
+       SEARCH
+    ===================================== */
+
+    if (memorySearchInput) {
+
+        memorySearchInput.addEventListener(
+            "input",
+            () => {
+
+                clearTimeout(
+                    searchTimeout
+                );
+
+
+                const value =
+                    memorySearchInput
+                        .value
+                        .trim();
+
+
+                if (
+                    clearSearchButton
+                ) {
+
+                    clearSearchButton.classList.toggle(
+                        "hidden",
+                        value.length ===
+                            0
+                    );
+                }
+
+
+                searchTimeout =
+                    setTimeout(
+                        async () => {
+
+                            await loadMemories();
+
+                        },
+                        300
+                    );
+            }
+        );
+    }
+
+
+    if (clearSearchButton) {
+
+        clearSearchButton.addEventListener(
+            "click",
+            async () => {
+
+                if (
+                    memorySearchInput
+                ) {
+
+                    memorySearchInput.value =
+                        "";
+                }
+
+
+                clearSearchButton.classList.add(
+                    "hidden"
+                );
+
+
+                await loadMemories();
+
+
+                if (
+                    memorySearchInput
+                ) {
+
+                    memorySearchInput.focus();
+                }
+            }
+        );
+    }
+
+
+    /* =====================================
+       LOGOUT
+    ===================================== */
+
     const logoutButton =
         document.getElementById(
             "logoutButton"
         );
 
-
-    const openUploadButton =
-        document.getElementById(
-            "openUploadButton"
-        );
-
-
-    const closeUploadButton =
-        document.getElementById(
-            "closeUploadButton"
-        );
-
-
-    const uploadModal =
-        document.getElementById(
-            "uploadModal"
-        );
-
-
-    const dropZone =
-        document.getElementById(
-            "dropZone"
-        );
-
-
-    const mediaInput =
-        document.getElementById(
-            "mediaInput"
-        );
-
-
-    const saveMemoryButton =
-        document.getElementById(
-            "saveMemoryButton"
-        );
-
-
-    const closeEditButton =
-        document.getElementById(
-            "closeEditButton"
-        );
-
-
-    const saveEditButton =
-        document.getElementById(
-            "saveEditButton"
-        );
-
-
-    const editModal =
-        document.getElementById(
-            "editModal"
-        );
-
-
-    /* LOGOUT */
 
     if (logoutButton) {
 
@@ -3558,7 +4206,15 @@ function setupEventListeners() {
     }
 
 
-    /* OPEN UPLOAD */
+    /* =====================================
+       OPEN UPLOAD
+    ===================================== */
+
+    const openUploadButton =
+        document.getElementById(
+            "openUploadButton"
+        );
+
 
     if (openUploadButton) {
 
@@ -3569,7 +4225,15 @@ function setupEventListeners() {
     }
 
 
-    /* CLOSE UPLOAD */
+    /* =====================================
+       CLOSE UPLOAD
+    ===================================== */
+
+    const closeUploadButton =
+        document.getElementById(
+            "closeUploadButton"
+        );
+
 
     if (closeUploadButton) {
 
@@ -3580,7 +4244,15 @@ function setupEventListeners() {
     }
 
 
-    /* CLICK OUTSIDE UPLOAD */
+    /* =====================================
+       CLICK OUTSIDE UPLOAD
+    ===================================== */
+
+    const uploadModal =
+        document.getElementById(
+            "uploadModal"
+        );
+
 
     if (uploadModal) {
 
@@ -3600,7 +4272,21 @@ function setupEventListeners() {
     }
 
 
-    /* DROP ZONE */
+    /* =====================================
+       DROP ZONE
+    ===================================== */
+
+    const dropZone =
+        document.getElementById(
+            "dropZone"
+        );
+
+
+    const mediaInput =
+        document.getElementById(
+            "mediaInput"
+        );
+
 
     if (dropZone) {
 
@@ -3666,7 +4352,9 @@ function setupEventListeners() {
     }
 
 
-    /* FILE INPUT */
+    /* =====================================
+       FILE INPUT
+    ===================================== */
 
     if (mediaInput) {
 
@@ -3682,7 +4370,15 @@ function setupEventListeners() {
     }
 
 
-    /* SAVE MEMORY */
+    /* =====================================
+       SAVE MEMORY
+    ===================================== */
+
+    const saveMemoryButton =
+        document.getElementById(
+            "saveMemoryButton"
+        );
+
 
     if (saveMemoryButton) {
 
@@ -3693,7 +4389,27 @@ function setupEventListeners() {
     }
 
 
-    /* CLOSE EDIT */
+    /* =====================================
+       EDIT MODAL
+    ===================================== */
+
+    const closeEditButton =
+        document.getElementById(
+            "closeEditButton"
+        );
+
+
+    const saveEditButton =
+        document.getElementById(
+            "saveEditButton"
+        );
+
+
+    const editModal =
+        document.getElementById(
+            "editModal"
+        );
+
 
     if (closeEditButton) {
 
@@ -3703,14 +4419,11 @@ function setupEventListeners() {
 
                 event.preventDefault();
 
-
                 closeEditModal();
             }
         );
     }
 
-
-    /* SAVE EDIT */
 
     if (saveEditButton) {
 
@@ -3720,14 +4433,11 @@ function setupEventListeners() {
 
                 event.preventDefault();
 
-
                 updateMemory();
             }
         );
     }
 
-
-    /* CLICK OUTSIDE EDIT */
 
     if (editModal) {
 

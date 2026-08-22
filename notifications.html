@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>Our Notifications ❤️</title>
+
+    <link
+        rel="stylesheet"
+        href="./css/app.css"
+    >
+
+    <link
+        rel="stylesheet"
+        href="./css/notifications.css"
+    >
+
+</head>
+
+
+<body>
+
+    <!-- NAVBAR -->
+
+    <header class="navbar">
+
+        <a
+            href="./app.html"
+            class="brand notification-brand"
+        >
+            <span>❤️</span>
+            Our Little Universe
+        </a>
+
+
+        <a
+            href="./app.html"
+            class="notification-back"
+        >
+            ← Back
+        </a>
+
+    </header>
+
+
+    <!-- PAGE -->
+
+    <main class="notifications-page">
+
+        <section class="notifications-header">
+
+            <p class="eyebrow">
+                OUR LITTLE UNIVERSE
+            </p>
+
+            <h1>
+                Little updates from us ❤️
+            </h1>
+
+            <p>
+                Every new memory, comment and reply.
+            </p>
+
+        </section>
+
+
+        <section class="notifications-toolbar">
+
+            <button
+                id="markAllReadButton"
+                type="button"
+            >
+                Mark all as read
+            </button>
+
+        </section>
+
+
+        <section
+            id="notificationsList"
+            class="notifications-list"
+        >
+
+            <div class="notifications-loading">
+
+                <div>
+                    ❤️
+                </div>
+
+                <p>
+                    Loading our little updates...
+                </p>
+
+            </div>
+
+        </section>
+
+    </main>
+
+
+    <!-- SUPABASE -->
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <script src="./config.js"></script>
+
+    <script
+        type="module"
+        src="./js/notifications.js"
+    ></script>
+
+</body>
+
+</html>

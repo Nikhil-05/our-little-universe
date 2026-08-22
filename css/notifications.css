@@ -1,0 +1,374 @@
+/* =========================================
+   NOTIFICATIONS PAGE
+========================================= */
+
+.notifications-page {
+
+    width:
+        min(850px, calc(100% - 40px));
+
+    margin:
+        70px auto 100px;
+}
+
+
+.notifications-header {
+
+    text-align:
+        center;
+
+    margin-bottom:
+        35px;
+}
+
+
+.notifications-header h1 {
+
+    font-size:
+        38px;
+
+    font-weight:
+        400;
+
+    margin:
+        8px 0 12px;
+}
+
+
+.notifications-header p {
+
+    color:
+        var(--muted);
+
+    line-height:
+        1.6;
+}
+
+
+/* =========================================
+   TOOLBAR
+========================================= */
+
+.notifications-toolbar {
+
+    display:
+        flex;
+
+    justify-content:
+        flex-end;
+
+    margin-bottom:
+        15px;
+}
+
+
+.notifications-toolbar button {
+
+    border:
+        1px solid var(--border);
+
+    background:
+        white;
+
+    color:
+        var(--text);
+
+    border-radius:
+        20px;
+
+    padding:
+        9px 16px;
+
+    cursor:
+        pointer;
+
+    font-family:
+        Arial,
+        sans-serif;
+
+    font-size:
+        12px;
+}
+
+
+/* =========================================
+   LIST
+========================================= */
+
+.notifications-list {
+
+    display:
+        flex;
+
+    flex-direction:
+        column;
+
+    gap:
+        10px;
+}
+
+
+/* =========================================
+   ITEM
+========================================= */
+
+.notification-item {
+
+    position:
+        relative;
+
+    display:
+        flex;
+
+    align-items:
+        center;
+
+    gap:
+        16px;
+
+    padding:
+        18px 20px;
+
+    border:
+        1px solid var(--border);
+
+    border-radius:
+        18px;
+
+    background:
+        var(--surface);
+
+    cursor:
+        pointer;
+
+    transition:
+        transform 0.15s ease,
+        box-shadow 0.15s ease,
+        background 0.15s ease;
+}
+
+
+.notification-item:hover {
+
+    transform:
+        translateY(-1px);
+
+    box-shadow:
+        0 8px 25px
+        rgba(0, 0, 0, 0.06);
+}
+
+
+.notification-unread {
+
+    background:
+        #fff7f8;
+
+    border-color:
+        #efd6dc;
+}
+
+
+.notification-read {
+
+    opacity:
+        0.78;
+}
+
+
+/* =========================================
+   ICON
+========================================= */
+
+.notification-icon {
+
+    width:
+        46px;
+
+    height:
+        46px;
+
+    min-width:
+        46px;
+
+    border-radius:
+        50%;
+
+    display:
+        flex;
+
+    align-items:
+        center;
+
+    justify-content:
+        center;
+
+    background:
+        #f9e3e7;
+
+    font-size:
+        20px;
+}
+
+
+/* =========================================
+   CONTENT
+========================================= */
+
+.notification-content {
+
+    flex:
+        1;
+}
+
+
+.notification-message {
+
+    margin:
+        0 0 6px;
+
+    color:
+        var(--text);
+
+    font-size:
+        15px;
+
+    line-height:
+        1.45;
+}
+
+
+.notification-time {
+
+    font-family:
+        Arial,
+        sans-serif;
+
+    color:
+        var(--muted);
+
+    font-size:
+        11px;
+}
+
+
+/* =========================================
+   UNREAD DOT
+========================================= */
+
+.notification-unread-dot {
+
+    position:
+        absolute;
+
+    top:
+        14px;
+
+    right:
+        14px;
+
+    width:
+        8px;
+
+    height:
+        8px;
+
+    border-radius:
+        50%;
+
+    background:
+        #a34b5e;
+}
+
+
+/* =========================================
+   EMPTY / LOADING
+========================================= */
+
+.notifications-empty,
+.notifications-loading {
+
+    text-align:
+        center;
+
+    padding:
+        80px 20px;
+
+    color:
+        var(--muted);
+}
+
+
+.notifications-empty > div,
+.notifications-loading > div {
+
+    font-size:
+        40px;
+
+    margin-bottom:
+        14px;
+}
+
+
+.notifications-empty h2 {
+
+    color:
+        var(--text);
+
+    font-weight:
+        400;
+
+    margin-bottom:
+        8px;
+}
+
+
+@media (
+    max-width: 600px
+) {
+
+    .notifications-page {
+
+        width:
+            min(
+                100% - 24px,
+                850px
+            );
+
+        margin-top:
+            40px;
+    }
+
+
+    .notifications-header h1 {
+
+        font-size:
+            30px;
+    }
+
+
+    .notification-item {
+
+        padding:
+            15px;
+
+        gap:
+            12px;
+    }
+
+
+    .notification-icon {
+
+        width:
+            40px;
+
+        height:
+            40px;
+
+        min-width:
+            40px;
+
+        font-size:
+            17px;
+    }
+}

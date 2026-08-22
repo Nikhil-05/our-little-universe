@@ -24,26 +24,46 @@
     <!-- NAVBAR -->
     <!-- ============================= -->
 
-    <header class="navbar">
+   <header class="navbar">
 
-        <div class="brand">
+    <div class="brand">
 
-            <span>❤️</span>
+        <span>❤️</span>
 
-            Our Little Universe
+        Our Little Universe
 
-        </div>
+    </div>
+
+
+    <div class="navbar-actions">
+
+        <a
+            href="./notifications.html"
+            class="notification-link"
+            aria-label="Notifications"
+        >
+            🔔
+
+            <span
+                id="notificationBadge"
+                class="notification-badge hidden"
+            >
+                0
+            </span>
+
+        </a>
 
 
         <button
             id="logoutButton"
             class="logout-button"
-            type="button"
         >
             Logout
         </button>
 
-    </header>
+    </div>
+
+</header>
 
 
     <!-- ============================= -->
@@ -75,7 +95,34 @@
             Every memory that became ours.
 
         </p>
+<div class="memory-search">
 
+    <div class="search-input-wrapper">
+
+        <span class="search-icon">
+            🔍
+        </span>
+
+        <input
+            id="memorySearchInput"
+            type="text"
+            placeholder="Search memories by title..."
+            autocomplete="off"
+            maxlength="100"
+        >
+
+        <button
+            id="clearSearchButton"
+            type="button"
+            class="clear-search-button hidden"
+            aria-label="Clear search"
+        >
+            ×
+        </button>
+
+    </div>
+
+</div>
 
         <button
             id="openUploadButton"
@@ -393,6 +440,11 @@
 <script src="./config.js"></script>
 
 <script type="module" src="./js/app.js"></script>
+
+<script
+    type="module"
+    src="./js/notification-badge.js"
+></script>
 
 </body>
 
