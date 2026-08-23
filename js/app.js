@@ -1,6 +1,12 @@
-/* =========================================
-   SUPABASE CLIENT
-========================================= */
+/* =========================================================
+   OUR LITTLE UNIVERSE
+   COMPLETE APP.JS
+========================================================= */
+
+
+/* =========================================================
+   IMPORTS
+========================================================= */
 
 import { FFmpeg } from "@ffmpeg/ffmpeg";
 
@@ -10,8 +16,13 @@ import {
 } from "@ffmpeg/util";
 
 import coreURL from "@ffmpeg/core?url";
+
 import wasmURL from "@ffmpeg/core/wasm?url";
 
+
+/* =========================================================
+   SUPABASE
+========================================================= */
 
 const supabaseClient =
     window.supabase.createClient(
@@ -20,9 +31,9 @@ const supabaseClient =
     );
 
 
-/* =========================================
+/* =========================================================
    STATE
-========================================= */
+========================================================= */
 
 let currentUser = null;
 
@@ -34,12 +45,10 @@ let ffmpegInstance = null;
 
 let ffmpegLoadingPromise = null;
 
-let currentSearchTerm = "";
 
-
-/* =========================================
-   FILE CONFIGURATION
-========================================= */
+/* =========================================================
+   CONSTANTS
+========================================================= */
 
 const allowedTypes = [
 
@@ -56,47 +65,314 @@ const allowedTypes = [
 ];
 
 
-const MAX_UPLOAD_SIZE =
+const MAX_IMAGE_INPUT_SIZE =
     50 * 1024 * 1024;
 
 
-const MAX_VIDEO_PROCESSING_SIZE =
+const MAX_VIDEO_INPUT_SIZE =
     1024 *
     1024 *
     1024;
 
 
-/* =========================================
+const MAX_STORED_MEDIA_SIZE =
+    50 * 1024 * 1024;
+
+
+/* =========================================================
+   GENERIC HELPERS
+========================================================= */
+
+function getPageUrl(
+    fileName
+) {
+
+    return new URL(
+        `./${fileName}`,
+        window.location.href
+    ).href;
+}
+
+
+function formatFileSize(
+    bytes
+) {
+
+    if (
+        !Number.isFinite(bytes) ||
+        bytes <= 0
+    ) {
+
+        return "0 KB";
+    }
+
+
+    if (
+        bytes < 1024
+    ) {
+
+        return `${bytes} B`;
+    }
+
+
+    if (
+        bytes <
+        1024 * 1024
+    ) {
+
+        return `${(
+            bytes / 1024
+        ).toFixed(1)} KB`;
+    }
+
+
+    if (
+        bytes <
+        1024 * 1024 * 1024
+    ) {
+
+        return `${(
+            bytes /
+            (1024 * 1024)
+        ).toFixed(1)} MB`;
+    }
+
+
+    return `${(
+        bytes /
+        (1024 * 1024 * 1024)
+    ).toFixed(2)} GB`;
+}
+
+
+function replaceExtension(
+    fileName,
+    extension
+) {
+
+    const dot =
+        fileName.lastIndexOf(
+            "."
+        );
+
+
+    if (
+        dot === -1
+    ) {
+
+        return (
+            `${fileName}.${extension}`
+        );
+    }
+
+
+    return (
+        `${fileName.substring(
+            0,
+            dot
+        )}.${extension}`
+    );
+}
+
+
+function escapeHtml(
+    value
+) {
+
+    return String(
+        value
+    )
+
+        .replaceAll(
+            "&",
+            "&amp;"
+        )
+
+        .replaceAll(
+            "<",
+            "&lt;"
+        )
+
+        .replaceAll(
+            ">",
+            "&gt;"
+        )
+
+        .replaceAll(
+            '"',
+            "&quot;"
+        )
+
+        .replaceAll(
+            "'",
+            "&#039;"
+        );
+}
+
+
+function escapeIlikePattern(
+    value
+) {
+
+    return String(
+        value
+    )
+
+        .replaceAll(
+            "\\",
+            "\\\\"
+        )
+
+        .replaceAll(
+            "%",
+            "\\%"
+        )
+
+        .replaceAll(
+            "_",
+            "\\_"
+        );
+}
+
+
+function formatMemoryDate(
+    dateString
+) {
+
+    const date =
+        new Date(
+            `${dateString}T00:00:00`
+        );
+
+
+    return date.toLocaleDateString(
+        "en-IN",
+        {
+
+            day:
+                "numeric",
+
+            month:
+                "long",
+
+            year:
+                "numeric"
+
+        }
+    );
+}
+
+
+function formatEditedDate(
+    timestamp
+) {
+
+    if (
+        !timestamp
+    ) {
+
+        return "";
+    }
+
+
+    return new Date(
+        timestamp
+    ).toLocaleString(
+        "en-IN",
+        {
+
+            day:
+                "numeric",
+
+            month:
+                "short",
+
+            year:
+                "numeric",
+
+            hour:
+                "numeric",
+
+            minute:
+                "2-digit"
+
+        }
+    );
+}
+
+
+function isEdited(
+    createdAt,
+    updatedAt
+) {
+
+    if (
+        !createdAt ||
+        !updatedAt
+    ) {
+
+        return false;
+    }
+
+
+    return (
+        new Date(
+            updatedAt
+        ).getTime() >
+
+        new Date(
+            createdAt
+        ).getTime() +
+
+        1000
+    );
+}
+
+
+/* =========================================================
    AUTHENTICATION
-========================================= */
+========================================================= */
 
 async function checkAuthentication() {
 
     const {
-        data: { session },
+        data: {
+            session
+        },
         error
     } =
         await supabaseClient.auth.getSession();
 
 
-    if (error) {
+    if (
+        error
+    ) {
 
         console.error(
             "Authentication error:",
             error
         );
 
+
         window.location.href =
-            "./login.html";
+            getPageUrl(
+                "login.html"
+            );
+
 
         return false;
     }
 
 
-    if (!session) {
+    if (
+        !session
+    ) {
 
         window.location.href =
-            "./login.html";
+            getPageUrl(
+                "login.html"
+            );
+
 
         return false;
     }
@@ -110,10 +386,6 @@ async function checkAuthentication() {
 }
 
 
-/* =========================================
-   LOGOUT
-========================================= */
-
 async function logout() {
 
     const {
@@ -122,25 +394,30 @@ async function logout() {
         await supabaseClient.auth.signOut();
 
 
-    if (error) {
+    if (
+        error
+    ) {
 
         console.error(
             "Logout error:",
             error
         );
 
+
         return;
     }
 
 
     window.location.href =
-        "./login.html";
+        getPageUrl(
+            "login.html"
+        );
 }
 
 
-/* =========================================
+/* =========================================================
    UPLOAD MODAL
-========================================= */
+========================================================= */
 
 function openModal() {
 
@@ -150,11 +427,9 @@ function openModal() {
         );
 
 
-    if (!modal) {
-
-        console.error(
-            "Upload modal not found."
-        );
+    if (
+        !modal
+    ) {
 
         return;
     }
@@ -178,7 +453,9 @@ function closeModal() {
         );
 
 
-    if (!modal) {
+    if (
+        !modal
+    ) {
 
         return;
     }
@@ -196,10 +473,6 @@ function closeModal() {
     resetUploadForm();
 }
 
-
-/* =========================================
-   RESET UPLOAD FORM
-========================================= */
 
 function resetUploadForm() {
 
@@ -245,14 +518,18 @@ function resetUploadForm() {
         );
 
 
-    if (title) {
+    if (
+        title
+    ) {
 
         title.value =
             "";
     }
 
 
-    if (date) {
+    if (
+        date
+    ) {
 
         date.value =
             new Date()
@@ -261,108 +538,63 @@ function resetUploadForm() {
     }
 
 
-    if (description) {
+    if (
+        description
+    ) {
 
         description.value =
             "";
     }
 
 
-    if (input) {
+    if (
+        input
+    ) {
 
         input.value =
             "";
     }
 
 
-    if (preview) {
+    if (
+        preview
+    ) {
 
         preview.innerHTML =
             "";
     }
 
 
-    if (message) {
+    if (
+        message
+    ) {
 
         message.textContent =
             "";
     }
 
 
-    if (saveButton) {
+    if (
+        saveButton
+    ) {
 
         saveButton.disabled =
             false;
+
 
         saveButton.textContent =
             "Save Memory ❤️";
     }
 
 
-    selectedFiles = [];
+    selectedFiles =
+        [];
 }
 
 
-/* =========================================
-   FILE SIZE FORMATTER
-========================================= */
-
-function formatFileSize(
-    bytes
-) {
-
-    if (
-        !Number.isFinite(bytes) ||
-        bytes <= 0
-    ) {
-
-        return "0 KB";
-    }
-
-
-    if (
-        bytes < 1024
-    ) {
-
-        return `${bytes} B`;
-    }
-
-
-    if (
-        bytes <
-        1024 * 1024
-    ) {
-
-        return `${(
-            bytes / 1024
-        ).toFixed(1)} KB`;
-    }
-
-
-    if (
-        bytes <
-        1024 *
-        1024 *
-        1024
-    ) {
-
-        return `${(
-            bytes /
-            (1024 * 1024)
-        ).toFixed(1)} MB`;
-    }
-
-
-    return `${(
-        bytes /
-        (1024 * 1024 * 1024)
-    ).toFixed(2)} GB`;
-}
-
-
-/* =========================================
+/* =========================================================
    FILE VALIDATION
-========================================= */
+========================================================= */
 
 function validateFile(
     file
@@ -381,70 +613,53 @@ function validateFile(
 
             message:
                 `${file.name} is not a supported file type.`
+
         };
     }
 
 
-    /* IMAGE */
-
     if (
+
         file.type.startsWith(
             "image/"
-        )
+        ) &&
+
+        file.size >
+            MAX_IMAGE_INPUT_SIZE
+
     ) {
-
-        if (
-            file.size >
-            MAX_UPLOAD_SIZE
-        ) {
-
-            return {
-
-                valid:
-                    false,
-
-                message:
-                    `${file.name} is too large to process safely.`
-            };
-        }
-
 
         return {
 
             valid:
-                true
+                false,
+
+            message:
+                `${file.name} is larger than 50 MB.`
+
         };
     }
 
 
-    /* VIDEO */
-
     if (
+
         file.type.startsWith(
             "video/"
-        )
+        ) &&
+
+        file.size >
+            MAX_VIDEO_INPUT_SIZE
+
     ) {
-
-        if (
-            file.size >
-            MAX_VIDEO_PROCESSING_SIZE
-        ) {
-
-            return {
-
-                valid:
-                    false,
-
-                message:
-                    `${file.name} is larger than 1 GB. Please trim the video before uploading.`
-            };
-        }
-
 
         return {
 
             valid:
-                true
+                false,
+
+            message:
+                `${file.name} is larger than 1 GB. Please trim it before uploading.`
+
         };
     }
 
@@ -452,30 +667,26 @@ function validateFile(
     return {
 
         valid:
-            false,
+            true
 
-        message:
-            "Unsupported file type."
     };
 }
 
-
-/* =========================================
-   ADD FILES
-========================================= */
 
 function addFiles(
     files
 ) {
 
-    const incomingFiles =
-        Array.from(
-            files || []
+    const uploadMessage =
+        document.getElementById(
+            "uploadMessage"
         );
 
 
     for (
-        const file of incomingFiles
+        const file of Array.from(
+            files || []
+        )
     ) {
 
         const validation =
@@ -488,15 +699,11 @@ function addFiles(
             !validation.valid
         ) {
 
-            const message =
-                document.getElementById(
-                    "uploadMessage"
-                );
+            if (
+                uploadMessage
+            ) {
 
-
-            if (message) {
-
-                message.textContent =
+                uploadMessage.textContent =
                     validation.message;
             }
 
@@ -515,10 +722,6 @@ function addFiles(
 }
 
 
-/* =========================================
-   RENDER PREVIEWS
-========================================= */
-
 function renderPreviews() {
 
     const preview =
@@ -527,7 +730,9 @@ function renderPreviews() {
         );
 
 
-    if (!preview) {
+    if (
+        !preview
+    ) {
 
         return;
     }
@@ -538,15 +743,17 @@ function renderPreviews() {
 
 
     selectedFiles.forEach(
-        (file) => {
+        (
+            file
+        ) => {
 
-            const wrapper =
+            const item =
                 document.createElement(
                     "div"
                 );
 
 
-            wrapper.className =
+            item.className =
                 "preview-item";
 
 
@@ -556,55 +763,52 @@ function renderPreviews() {
                 );
 
 
+            let visual;
+
+
             if (
                 file.type.startsWith(
                     "image/"
                 )
             ) {
 
-                const image =
+                visual =
                     document.createElement(
                         "img"
                     );
 
 
-                image.src =
+                visual.src =
                     url;
 
 
-                image.alt =
+                visual.alt =
                     file.name;
-
-
-                wrapper.appendChild(
-                    image
-                );
-
 
             } else {
 
-                const video =
+                visual =
                     document.createElement(
                         "video"
                     );
 
 
-                video.src =
+                visual.src =
                     url;
 
 
-                video.muted =
+                visual.muted =
                     true;
 
 
-                video.preload =
+                visual.preload =
                     "metadata";
-
-
-                wrapper.appendChild(
-                    video
-                );
             }
+
+
+            item.appendChild(
+                visual
+            );
 
 
             const badge =
@@ -625,7 +829,7 @@ function renderPreviews() {
                     : "PHOTO";
 
 
-            wrapper.appendChild(
+            item.appendChild(
                 badge
             );
 
@@ -646,22 +850,22 @@ function renderPreviews() {
                 );
 
 
-            wrapper.appendChild(
+            item.appendChild(
                 size
             );
 
 
             preview.appendChild(
-                wrapper
+                item
             );
         }
     );
 }
 
 
-/* =========================================
+/* =========================================================
    IMAGE COMPRESSION
-========================================= */
+========================================================= */
 
 async function compressImage(
     file
@@ -686,10 +890,13 @@ async function compressImage(
 
 
     if (
+
         width >
-        MAX_DIMENSION ||
+            MAX_DIMENSION ||
+
         height >
-        MAX_DIMENSION
+            MAX_DIMENSION
+
     ) {
 
         const scale =
@@ -739,7 +946,9 @@ async function compressImage(
         );
 
 
-    if (!context) {
+    if (
+        !context
+    ) {
 
         bitmap.close();
 
@@ -772,7 +981,9 @@ async function compressImage(
 
     const webpBlob =
         await new Promise(
-            (resolve) => {
+            (
+                resolve
+            ) => {
 
                 canvas.toBlob(
                     resolve,
@@ -783,7 +994,9 @@ async function compressImage(
         );
 
 
-    if (!webpBlob) {
+    if (
+        !webpBlob
+    ) {
 
         throw new Error(
             "Image compression failed."
@@ -793,12 +1006,14 @@ async function compressImage(
 
     if (
         webpBlob.size >=
-        file.size
+            file.size
     ) {
 
         const jpegBlob =
             await new Promise(
-                (resolve) => {
+                (
+                    resolve
+                ) => {
 
                     canvas.toBlob(
                         resolve,
@@ -810,9 +1025,12 @@ async function compressImage(
 
 
         if (
+
             jpegBlob &&
+
             jpegBlob.size <
                 webpBlob.size
+
         ) {
 
             return new File(
@@ -835,6 +1053,7 @@ async function compressImage(
                         Date.now()
 
                 }
+
             );
         }
     }
@@ -860,51 +1079,14 @@ async function compressImage(
                 Date.now()
 
         }
-    );
-}
-
-
-/* =========================================
-   REPLACE FILE EXTENSION
-========================================= */
-
-function replaceExtension(
-    fileName,
-    extension
-) {
-
-    const dot =
-        fileName.lastIndexOf(
-            "."
-        );
-
-
-    if (
-        dot === -1
-    ) {
-
-        return `${fileName}.${extension}`;
-    }
-
-
-    return (
-
-        fileName.substring(
-            0,
-            dot
-        ) +
-
-        "." +
-
-        extension
 
     );
 }
 
 
-/* =========================================
-   LOAD FFMPEG
-========================================= */
+/* =========================================================
+   FFMPEG
+========================================================= */
 
 async function loadFFmpeg(
     statusCallback
@@ -945,7 +1127,11 @@ async function loadFFmpeg(
 
             ffmpeg.on(
                 "log",
-                ({ message }) => {
+                (
+                    {
+                        message
+                    }
+                ) => {
 
                     console.log(
                         "[FFmpeg]",
@@ -957,7 +1143,11 @@ async function loadFFmpeg(
 
             ffmpeg.on(
                 "progress",
-                ({ progress }) => {
+                (
+                    {
+                        progress
+                    }
+                ) => {
 
                     if (
 
@@ -1023,12 +1213,6 @@ async function loadFFmpeg(
         error
     ) {
 
-        console.error(
-            "FFmpeg initialization failed:",
-            error
-        );
-
-
         ffmpegLoadingPromise =
             null;
 
@@ -1037,32 +1221,16 @@ async function loadFFmpeg(
             null;
 
 
+        console.error(
+            "FFmpeg initialization failed:",
+            error
+        );
+
+
         throw error;
     }
 }
 
-
-/* =========================================
-   CONVERT FILE TO UINT8ARRAY
-========================================= */
-
-async function fileToUint8Array(
-    file
-) {
-
-    const buffer =
-        await file.arrayBuffer();
-
-
-    return new Uint8Array(
-        buffer
-    );
-}
-
-
-/* =========================================
-   SAFE FFMPEG DELETE
-========================================= */
 
 async function cleanupFFmpegFile(
     ffmpeg,
@@ -1072,28 +1240,8 @@ async function cleanupFFmpegFile(
     try {
 
         if (
-
-            ffmpeg.fs &&
-
-            typeof ffmpeg.fs.unlink ===
-                "function"
-
-        ) {
-
-            ffmpeg.fs.unlink(
-                fileName
-            );
-
-
-            return;
-        }
-
-
-        if (
-
             typeof ffmpeg.deleteFile ===
-                "function"
-
+            "function"
         ) {
 
             await ffmpeg.deleteFile(
@@ -1106,31 +1254,21 @@ async function cleanupFFmpegFile(
     ) {
 
         console.warn(
-            `Could not clean up ${fileName}:`,
+            `FFmpeg cleanup failed for ${fileName}:`,
             error
         );
     }
 }
 
 
-/* =========================================
-   VIDEO COMPRESSION
-========================================= */
-
 async function compressVideo(
     file,
     statusCallback
 ) {
 
-    const MAX_VIDEO_SIZE =
-        1024 *
-        1024 *
-        1024;
-
-
     if (
         file.size >
-        MAX_VIDEO_SIZE
+            MAX_VIDEO_INPUT_SIZE
     ) {
 
         throw new Error(
@@ -1231,6 +1369,7 @@ async function compressVideo(
                 [
                     outputData
                 ],
+
                 {
                     type:
                         "video/mp4"
@@ -1259,91 +1398,44 @@ async function compressVideo(
                         Date.now()
 
                 }
+
             );
 
 
-        await ffmpeg.deleteFile(
+        await cleanupFFmpegFile(
+            ffmpeg,
             inputName
         );
 
 
-        await ffmpeg.deleteFile(
+        await cleanupFFmpegFile(
+            ffmpeg,
             outputName
         );
 
 
         return optimizedFile;
 
-
     } catch (
         error
     ) {
 
-        try {
-
-            await ffmpeg.deleteFile(
-                inputName
-            );
-
-        } catch (_) {}
+        await cleanupFFmpegFile(
+            ffmpeg,
+            inputName
+        );
 
 
-        try {
-
-            await ffmpeg.deleteFile(
-                outputName
-            );
-
-        } catch (_) {}
+        await cleanupFFmpegFile(
+            ffmpeg,
+            outputName
+        );
 
 
         throw error;
     }
 }
 
-
-/* =========================================
-   VIDEO EXTENSION
-========================================= */
-
-function getVideoExtension(
-    mimeType
-) {
-
-    if (
-        mimeType ===
-        "video/webm"
-    ) {
-
-        return "webm";
-    }
-
-
-    if (
-        mimeType ===
-        "video/quicktime"
-    ) {
-
-        return "mov";
-    }
-
-
-    if (
-        mimeType ===
-        "video/x-matroska"
-    ) {
-
-        return "mkv";
-    }
-
-
-    return "mp4";
-}
-
-
-/* =========================================
-   OPTIMIZE MEDIA
-========================================= */
 
 async function optimizeMedia(
     file,
@@ -1414,9 +1506,9 @@ async function optimizeMedia(
 }
 
 
-/* =========================================
+/* =========================================================
    CREATE MEMORY
-========================================= */
+========================================================= */
 
 async function createMemory() {
 
@@ -1451,18 +1543,17 @@ async function createMemory() {
 
 
     if (
-
         !titleInput ||
         !dateInput ||
         !descriptionInput ||
         !saveButton ||
         !message
-
     ) {
 
         console.error(
             "Upload form elements are missing."
         );
+
 
         return;
     }
@@ -1487,6 +1578,7 @@ async function createMemory() {
         message.textContent =
             "Give this memory a title ❤️";
 
+
         return;
     }
 
@@ -1497,6 +1589,7 @@ async function createMemory() {
 
         message.textContent =
             "Please choose the memory date.";
+
 
         return;
     }
@@ -1510,6 +1603,7 @@ async function createMemory() {
         message.textContent =
             "Add at least one photo or video.";
 
+
         return;
     }
 
@@ -1521,12 +1615,17 @@ async function createMemory() {
         message.textContent =
             "Your session has expired. Please log in again.";
 
+
         return;
     }
 
 
     saveButton.disabled =
         true;
+
+
+    saveButton.textContent =
+        "Saving our memory... ❤️";
 
 
     try {
@@ -1536,8 +1635,12 @@ async function createMemory() {
 
 
         const {
-            data: memory,
-            error: memoryError
+            data:
+                memory,
+
+            error:
+                memoryError
+
         } =
             await supabaseClient
 
@@ -1582,15 +1685,13 @@ async function createMemory() {
         ) {
 
             const originalFile =
-                selectedFiles[index];
+                selectedFiles[
+                    index
+                ];
 
 
             const position =
                 index + 1;
-
-
-            message.textContent =
-                `Optimizing ${position} of ${selectedFiles.length}... ❤️`;
 
 
             let optimizedFile;
@@ -1609,6 +1710,7 @@ async function createMemory() {
 
                             message.textContent =
                                 `File ${position}/${selectedFiles.length}: ${status}`;
+
                         }
 
                     );
@@ -1616,12 +1718,6 @@ async function createMemory() {
             } catch (
                 error
             ) {
-
-                console.error(
-                    "Optimization failed:",
-                    error
-                );
-
 
                 throw new Error(
                     `Could not optimize ${originalFile.name}. ${error.message}`
@@ -1631,13 +1727,13 @@ async function createMemory() {
 
             if (
                 optimizedFile.size >
-                MAX_UPLOAD_SIZE
+                    MAX_STORED_MEDIA_SIZE
             ) {
 
                 throw new Error(
                     `${originalFile.name} is still ${formatFileSize(
                         optimizedFile.size
-                    )} after optimization, which is above the 50 MB upload limit.`
+                    )} after optimization.`
                 );
             }
 
@@ -1749,21 +1845,6 @@ async function createMemory() {
 
                 throw mediaError;
             }
-
-
-            console.log(
-
-                `Optimized:
-${originalFile.name}
-${formatFileSize(
-    originalFile.size
-)}
-→
-${formatFileSize(
-    optimizedFile.size
-)}`
-
-            );
         }
 
 
@@ -1777,7 +1858,7 @@ ${formatFileSize(
             ) =>
                 setTimeout(
                     resolve,
-                    800
+                    700
                 )
         );
 
@@ -1786,7 +1867,6 @@ ${formatFileSize(
 
 
         await loadMemories();
-
 
     } catch (
         error
@@ -1799,7 +1879,7 @@ ${formatFileSize(
 
 
         message.textContent =
-            error.message ||
+            error?.message ||
             "Something went wrong while saving this memory.";
 
 
@@ -1813,9 +1893,9 @@ ${formatFileSize(
 }
 
 
-/* =========================================
+/* =========================================================
    LOAD MEMORIES
-========================================= */
+========================================================= */
 
 async function loadMemories() {
 
@@ -1825,7 +1905,9 @@ async function loadMemories() {
         );
 
 
-    if (!timeline) {
+    if (
+        !timeline
+    ) {
 
         return;
     }
@@ -1853,19 +1935,53 @@ async function loadMemories() {
         );
 
 
-    const searchTerm =
+    const hash =
+        window.location.hash;
+
+
+    /*
+     * A notification target should always
+     * show the complete timeline, regardless
+     * of a previous search.
+     */
+
+    if (
+        hash.startsWith(
+            "#memory-"
+        ) &&
         searchInput
+    ) {
 
-            ? searchInput.value.trim()
-
-            : "";
-
-
-    currentSearchTerm =
-        searchTerm;
+        searchInput.value =
+            "";
 
 
-    let memoryQuery =
+        document
+            .getElementById(
+                "clearSearchButton"
+            )
+            ?.classList.add(
+                "hidden"
+            );
+    }
+
+
+    const searchTerm =
+        hash.startsWith(
+            "#memory-"
+        )
+
+            ? ""
+
+            : (
+                searchInput
+                    ?.value
+                    .trim() ||
+                ""
+            );
+
+
+    let query =
         supabaseClient
 
             .from(
@@ -1879,6 +1995,7 @@ async function loadMemories() {
                 memory_date,
                 created_by,
                 created_at,
+                updated_at,
                 media (
                     id,
                     file_name,
@@ -1887,39 +2004,43 @@ async function loadMemories() {
                     created_by,
                     created_at
                 )
-            `);
+            `)
+
+            .order(
+                "memory_date",
+                {
+                    ascending:
+                        false
+                }
+            );
 
 
     if (
         searchTerm
     ) {
 
-        const escapedSearch =
-            escapeIlikePattern(
-                searchTerm
-            );
+        query =
+            query.ilike(
 
-
-        memoryQuery =
-            memoryQuery.ilike(
                 "title",
-                `%${escapedSearch}%`
+
+                `%${escapeIlikePattern(
+                    searchTerm
+                )}%`
+
             );
     }
 
 
     const {
-        data: memories,
+        data:
+            memories,
+
         error:
             memoriesError
+
     } =
-        await memoryQuery.order(
-            "memory_date",
-            {
-                ascending:
-                    false
-            }
-        );
+        await query;
 
 
     if (
@@ -1958,109 +2079,103 @@ async function loadMemories() {
 
     if (
         !memories ||
-        memories.length === 0
+        memories.length ===
+            0
     ) {
 
-        if (
+        timeline.innerHTML =
             searchTerm
-        ) {
 
-            timeline.innerHTML =
-                `
-                <div class="empty-state">
+                ? `
+                    <div class="empty-state">
 
-                    <div class="empty-heart">
-                        🔍
+                        <div class="empty-heart">
+                            🔍
+                        </div>
+
+                        <h2>
+                            No memories found.
+                        </h2>
+
+                        <p>
+                            Nothing matches
+                            "<strong>${escapeHtml(
+                                searchTerm
+                            )}</strong>"
+                            in the title.
+                        </p>
+
                     </div>
-
-                    <h2>
-                        No memories found.
-                    </h2>
-
-                    <p>
-                        Nothing matches
-                        "<strong>${escapeHtml(
-                            searchTerm
-                        )}</strong>"
-                        in the title.
-                    </p>
-
-                </div>
-            `;
-
-        } else {
-
-            timeline.innerHTML =
                 `
-                <div class="empty-state">
 
-                    <div class="empty-heart">
-                        ❤️
+                : `
+                    <div class="empty-state">
+
+                        <div class="empty-heart">
+                            ❤️
+                        </div>
+
+                        <h2>
+                            Our story starts here.
+                        </h2>
+
+                        <p>
+                            Add your first memory together.
+                        </p>
+
                     </div>
-
-                    <h2>
-                        Our story starts here.
-                    </h2>
-
-                    <p>
-                        Add your first memory together.
-                    </p>
-
-                </div>
-            `;
-        }
+                `;
 
 
         return;
     }
 
 
-    /* =====================================
-       LOAD COMMENTS BY MEDIA
-       
-       IMPORTANT:
-       comments table uses media_id
-    ===================================== */
+    /* =====================================================
+       LOAD COMMENTS
+       comments.media_id is your real schema
+    ===================================================== */
 
-    const mediaIds = [];
+    const mediaIds =
+        [];
 
 
-    memories.forEach(
-        (
-            memory
-        ) => {
+    for (
+        const memory of memories
+    ) {
 
-            memory.media =
-                memory.media ||
+        memory.media =
+            memory.media ||
+            [];
+
+
+        for (
+            const media of
+                memory.media
+        ) {
+
+            media.comments =
                 [];
 
 
-            memory.media.forEach(
-                (
-                    media
-                ) => {
-
-                    media.comments =
-                        [];
-
-
-                    mediaIds.push(
-                        media.id
-                    );
-                }
+            mediaIds.push(
+                media.id
             );
         }
-    );
+    }
 
 
     if (
-        mediaIds.length > 0
+        mediaIds.length
     ) {
 
         const {
-            data: comments,
+            data:
+                comments,
+
             error:
                 commentsError
+
         } =
             await supabaseClient
 
@@ -2074,7 +2189,8 @@ async function loadMemories() {
                     user_id,
                     comment_text,
                     parent_comment_id,
-                    created_at
+                    created_at,
+                    updated_at
                 `)
 
                 .in(
@@ -2096,7 +2212,7 @@ async function loadMemories() {
         ) {
 
             console.warn(
-                "Comments could not be loaded. Memories will still be displayed:",
+                "Comments could not be loaded:",
                 commentsError
             );
 
@@ -2107,43 +2223,41 @@ async function loadMemories() {
                 [];
 
 
-            memories.forEach(
-                (
-                    memory
-                ) => {
+            for (
+                const memory of memories
+            ) {
 
-                    memory.media.forEach(
-                        (
-                            media
-                        ) => {
+                for (
+                    const media of
+                        memory.media
+                ) {
 
-                            media.comments =
-
-                                allComments.filter(
-
-                                    (
-                                        comment
-                                    ) =>
-
-                                        comment.media_id ===
-                                        media.id
-
-                                );
-                        }
-                    );
+                    media.comments =
+                        allComments.filter(
+                            (
+                                comment
+                            ) =>
+                                comment.media_id ===
+                                media.id
+                        );
                 }
-            );
+            }
         }
     }
 
 
-    /* =====================================
-       RENDER TIMELINE
-    ===================================== */
+    /* =====================================================
+       RENDER
+    ===================================================== */
 
     timeline.innerHTML =
         "";
 
+
+    /*
+     * IMPORTANT:
+     * This is the ONLY render loop.
+     */
 
     for (
         const memory of memories
@@ -2159,12 +2273,206 @@ async function loadMemories() {
             element
         );
     }
+
+
+    /*
+     * IMPORTANT:
+     * Run AFTER the cards exist in the DOM.
+     */
+
+    focusMemoryFromHash();
 }
 
 
-/* =========================================
-   SIGNED MEDIA URL
-========================================= */
+/* =========================================================
+   NOTIFICATION TARGET
+========================================================= */
+
+function focusMemoryFromHash() {
+
+    const hash =
+        window.location.hash;
+
+
+    if (
+        !hash.startsWith(
+            "#memory-"
+        )
+    ) {
+
+        return;
+    }
+
+
+    const hashValue =
+        hash.substring(
+            1
+        );
+
+
+    const marker =
+        "-comment-";
+
+
+    const markerIndex =
+        hashValue.indexOf(
+            marker
+        );
+
+
+    let memoryId;
+
+    let commentId =
+        null;
+
+
+    if (
+        markerIndex !==
+        -1
+    ) {
+
+        memoryId =
+            hashValue.substring(
+                "memory-".length,
+                markerIndex
+            );
+
+
+        commentId =
+            hashValue.substring(
+                markerIndex +
+                marker.length
+            );
+
+    } else {
+
+        memoryId =
+            hashValue.substring(
+                "memory-".length
+            );
+    }
+
+
+    if (
+        !memoryId
+    ) {
+
+        return;
+    }
+
+
+    const memory =
+        document.getElementById(
+            `memory-${memoryId}`
+        );
+
+
+    if (
+        !memory
+    ) {
+
+        console.warn(
+            "Notification memory not found:",
+            memoryId
+        );
+
+
+        return;
+    }
+
+
+    memory.scrollIntoView({
+
+        behavior:
+            "smooth",
+
+        block:
+            "center"
+
+    });
+
+
+    memory.classList.add(
+        "memory-notification-highlight"
+    );
+
+
+    setTimeout(
+        () => {
+
+            memory.classList.remove(
+                "memory-notification-highlight"
+            );
+
+        },
+        2500
+    );
+
+
+    if (
+        commentId
+    ) {
+
+        setTimeout(
+            () => {
+
+                const comment =
+                    document.getElementById(
+                        `comment-${commentId}`
+                    );
+
+
+                if (
+                    !comment
+                ) {
+
+                    console.warn(
+                        "Notification comment not found:",
+                        commentId
+                    );
+
+
+                    return;
+                }
+
+
+                comment.scrollIntoView({
+
+                    behavior:
+                        "smooth",
+
+                    block:
+                        "center"
+
+                });
+
+
+                comment.classList.add(
+                    "comment-notification-highlight"
+                );
+
+
+                setTimeout(
+                    () => {
+
+                        comment.classList.remove(
+                            "comment-notification-highlight"
+                        );
+
+                    },
+                    2500
+                );
+
+            },
+            550
+        );
+    }
+}
+
+
+/* =========================================================
+   SIGNED URL
+========================================================= */
 
 async function getSignedMediaUrl(
     filePath
@@ -2202,14 +2510,16 @@ async function getSignedMediaUrl(
     }
 
 
-    return data?.signedUrl ||
-        null;
+    return (
+        data?.signedUrl ||
+        null
+    );
 }
 
 
-/* =========================================
-   CREATE MEMORY ELEMENT
-========================================= */
+/* =========================================================
+   MEMORY CARD
+========================================================= */
 
 async function createMemoryElement(
     memory
@@ -2221,6 +2531,10 @@ async function createMemoryElement(
         );
 
 
+    /*
+     * Notification target
+     */
+
     article.id =
         `memory-${memory.id}`;
 
@@ -2228,8 +2542,6 @@ async function createMemoryElement(
     article.className =
         "memory-card";
 
-
-    /* HEADER */
 
     const header =
         document.createElement(
@@ -2244,6 +2556,13 @@ async function createMemoryElement(
     const info =
         document.createElement(
             "div"
+        );
+
+
+    const edited =
+        isEdited(
+            memory.created_at,
+            memory.updated_at
         );
 
 
@@ -2264,10 +2583,20 @@ async function createMemoryElement(
             )}
 
         </h2>
+
+        ${
+            edited
+                ? `
+                    <div class="memory-edited-label">
+                        Edited · ${formatEditedDate(
+                            memory.updated_at
+                        )}
+                    </div>
+                  `
+                : ""
+        }
     `;
 
-
-    /* ACTIONS */
 
     const actions =
         document.createElement(
@@ -2315,22 +2644,14 @@ async function createMemoryElement(
         "🗑️ Delete";
 
 
-    actions.appendChild(
-        editButton
-    );
-
-
-    actions.appendChild(
+    actions.append(
+        editButton,
         deleteButton
     );
 
 
-    header.appendChild(
-        info
-    );
-
-
-    header.appendChild(
+    header.append(
+        info,
         actions
     );
 
@@ -2339,8 +2660,6 @@ async function createMemoryElement(
         header
     );
 
-
-    /* DESCRIPTION */
 
     if (
         memory.description
@@ -2366,15 +2685,13 @@ async function createMemoryElement(
     }
 
 
-    /* MEDIA */
-
     const mediaItems =
         memory.media ||
         [];
 
 
     if (
-        mediaItems.length > 0
+        mediaItems.length
     ) {
 
         const grid =
@@ -2405,21 +2722,17 @@ async function createMemoryElement(
             }
 
 
-            const element =
+            grid.appendChild(
                 createMediaElement(
                     media,
                     signedUrl
-                );
-
-
-            grid.appendChild(
-                element
+                )
             );
         }
 
 
         if (
-            grid.children.length > 0
+            grid.children.length
         ) {
 
             article.appendChild(
@@ -2428,8 +2741,6 @@ async function createMemoryElement(
         }
     }
 
-
-    /* AUTHOR */
 
     const author =
         document.createElement(
@@ -2450,8 +2761,6 @@ async function createMemoryElement(
     );
 
 
-    /* EDIT */
-
     editButton.addEventListener(
         "click",
         (
@@ -2470,8 +2779,6 @@ async function createMemoryElement(
         }
     );
 
-
-    /* DELETE */
 
     deleteButton.addEventListener(
         "click",
@@ -2496,9 +2803,9 @@ async function createMemoryElement(
 }
 
 
-/* =========================================
-   CREATE MEDIA ELEMENT
-========================================= */
+/* =========================================================
+   MEDIA
+========================================================= */
 
 function createMediaElement(
     media,
@@ -2525,8 +2832,6 @@ function createMediaElement(
         "media-item";
 
 
-    /* IMAGE */
-
     if (
         media.media_type ===
         "image"
@@ -2551,24 +2856,9 @@ function createMediaElement(
             "lazy";
 
 
-        image.addEventListener(
-            "error",
-            () => {
-
-                console.warn(
-                    "Image failed to load:",
-                    media.file_path
-                );
-            }
-        );
-
-
         mediaItem.appendChild(
             image
         );
-
-
-    /* VIDEO */
 
     } else if (
         media.media_type ===
@@ -2613,16 +2903,10 @@ function createMediaElement(
     );
 
 
-    /* COMMENTS */
-
-    const commentsSection =
+    wrapper.appendChild(
         createCommentsSection(
             media
-        );
-
-
-    wrapper.appendChild(
-        commentsSection
+        )
     );
 
 
@@ -2630,9 +2914,9 @@ function createMediaElement(
 }
 
 
-/* =========================================
+/* =========================================================
    COMMENTS SECTION
-========================================= */
+========================================================= */
 
 function createCommentsSection(
     media
@@ -2664,10 +2948,8 @@ function createCommentsSection(
 
 
     header.textContent =
-        comments.length > 0
-
+        comments.length
             ? `❤️ Comments (${comments.length})`
-
             : "❤️ Comments";
 
 
@@ -2676,17 +2958,17 @@ function createCommentsSection(
     );
 
 
-    const commentsList =
+    const list =
         document.createElement(
             "div"
         );
 
 
-    commentsList.className =
+    list.className =
         "comments-list";
 
 
-    const rootComments =
+    const roots =
         comments.filter(
             (
                 comment
@@ -2695,26 +2977,24 @@ function createCommentsSection(
         );
 
 
-    rootComments.forEach(
+    roots.forEach(
         (
             comment
         ) => {
 
-            commentsList.appendChild(
-
+            list.appendChild(
                 createCommentElement(
                     comment,
                     comments,
                     media.id
                 )
-
             );
         }
     );
 
 
     section.appendChild(
-        commentsList
+        list
     );
 
 
@@ -2770,20 +3050,14 @@ function createCommentsSection(
 
     button.addEventListener(
         "click",
-        async () => {
+        () => {
 
-            await addComment(
-
+            addComment(
                 media.id,
-
                 input.value,
-
                 null,
-
                 input,
-
                 button
-
             );
         }
     );
@@ -2791,7 +3065,7 @@ function createCommentsSection(
 
     input.addEventListener(
         "keydown",
-        async (
+        (
             event
         ) => {
 
@@ -2803,30 +3077,20 @@ function createCommentsSection(
                 event.preventDefault();
 
 
-                await addComment(
-
+                addComment(
                     media.id,
-
                     input.value,
-
                     null,
-
                     input,
-
                     button
-
                 );
             }
         }
     );
 
 
-    inputArea.appendChild(
-        input
-    );
-
-
-    inputArea.appendChild(
+    inputArea.append(
+        input,
         button
     );
 
@@ -2840,9 +3104,9 @@ function createCommentsSection(
 }
 
 
-/* =========================================
+/* =========================================================
    COMMENT ELEMENT
-========================================= */
+========================================================= */
 
 function createCommentElement(
     comment,
@@ -2856,11 +3120,17 @@ function createCommentElement(
         );
 
 
+    /*
+     * Notification target
+     */
+
+    container.id =
+        `comment-${comment.id}`;
+
+
     container.className =
         "comment-container";
 
-
-    /* COMMENT BUBBLE */
 
     const bubble =
         document.createElement(
@@ -2871,8 +3141,6 @@ function createCommentElement(
     bubble.className =
         "comment-bubble";
 
-
-    /* HEADER */
 
     const header =
         document.createElement(
@@ -2900,13 +3168,6 @@ function createCommentElement(
         );
 
 
-    header.appendChild(
-        author
-    );
-
-
-    /* ACTIONS */
-
     const actions =
         document.createElement(
             "div"
@@ -2917,19 +3178,10 @@ function createCommentElement(
         "comment-actions";
 
 
-    const isOwner =
-        Boolean(
-
-            currentUser &&
-
-            comment.user_id ===
-                currentUser.id
-
-        );
-
-
     if (
-        isOwner
+        currentUser &&
+        comment.user_id ===
+            currentUser.id
     ) {
 
         const editButton =
@@ -2955,11 +3207,8 @@ function createCommentElement(
             () => {
 
                 startEditComment(
-
                     comment,
-
                     bubble
-
                 );
             }
         );
@@ -2985,27 +3234,21 @@ function createCommentElement(
 
         deleteButton.addEventListener(
             "click",
-            async () => {
+            () => {
 
-                await deleteComment(
+                deleteComment(
                     comment.id
                 );
             }
         );
 
 
-        actions.appendChild(
-            editButton
-        );
-
-
-        actions.appendChild(
+        actions.append(
+            editButton,
             deleteButton
         );
     }
 
-
-    /* REPLY */
 
     const replyButton =
         document.createElement(
@@ -3030,7 +3273,8 @@ function createCommentElement(
     );
 
 
-    header.appendChild(
+    header.append(
+        author,
         actions
     );
 
@@ -3039,8 +3283,6 @@ function createCommentElement(
         header
     );
 
-
-    /* COMMENT TEXT */
 
     const text =
         document.createElement(
@@ -3061,25 +3303,47 @@ function createCommentElement(
     );
 
 
+    /*
+     * Edited indicator
+     */
+
+    if (
+        isEdited(
+            comment.created_at,
+            comment.updated_at
+        )
+    ) {
+
+        const editedLabel =
+            document.createElement(
+                "div"
+            );
+
+
+        editedLabel.className =
+            "comment-edited-label";
+
+
+        editedLabel.textContent =
+            `Edited · ${formatEditedDate(
+                comment.updated_at
+            )}`;
+
+
+        bubble.appendChild(
+            editedLabel
+        );
+    }
+
+
     container.appendChild(
         bubble
     );
 
 
-    /* REPLIES */
-
-    const replies =
-        allComments.filter(
-
-            (
-                item
-            ) =>
-
-                item.parent_comment_id ===
-                comment.id
-
-        );
-
+    /* =====================================================
+       REPLIES
+    ===================================================== */
 
     const repliesContainer =
         document.createElement(
@@ -3091,23 +3355,27 @@ function createCommentElement(
         "replies-container";
 
 
+    const replies =
+        allComments.filter(
+            (
+                item
+            ) =>
+                item.parent_comment_id ===
+                comment.id
+        );
+
+
     replies.forEach(
         (
             reply
         ) => {
 
             repliesContainer.appendChild(
-
                 createCommentElement(
-
                     reply,
-
                     allComments,
-
                     mediaId
-
                 )
-
             );
         }
     );
@@ -3118,23 +3386,26 @@ function createCommentElement(
     );
 
 
-    /* REPLY INPUT */
+    /* =====================================================
+       REPLY INPUT
+    ===================================================== */
 
     replyButton.addEventListener(
         "click",
         () => {
 
-            const existingReplyBox =
+            const existing =
                 container.querySelector(
                     ".reply-input-area"
                 );
 
 
             if (
-                existingReplyBox
+                existing
             ) {
 
-                existingReplyBox.remove();
+                existing.remove();
+
 
                 return;
             }
@@ -3192,20 +3463,14 @@ function createCommentElement(
 
             button.addEventListener(
                 "click",
-                async () => {
+                () => {
 
-                    await addComment(
-
+                    addComment(
                         mediaId,
-
                         input.value,
-
                         comment.id,
-
                         input,
-
                         button
-
                     );
                 }
             );
@@ -3213,7 +3478,7 @@ function createCommentElement(
 
             input.addEventListener(
                 "keydown",
-                async (
+                (
                     event
                 ) => {
 
@@ -3225,30 +3490,20 @@ function createCommentElement(
                         event.preventDefault();
 
 
-                        await addComment(
-
+                        addComment(
                             mediaId,
-
                             input.value,
-
                             comment.id,
-
                             input,
-
                             button
-
                         );
                     }
                 }
             );
 
 
-            replyArea.appendChild(
-                input
-            );
-
-
-            replyArea.appendChild(
+            replyArea.append(
+                input,
                 button
             );
 
@@ -3268,9 +3523,136 @@ function createCommentElement(
 }
 
 
-/* =========================================
+function getCommentAuthor(
+    userId
+) {
+
+    if (
+        currentUser &&
+        userId ===
+            currentUser.id
+    ) {
+
+        return "You";
+    }
+
+
+    return "Your love ❤️";
+}
+
+
+/* =========================================================
+   ADD COMMENT / REPLY
+========================================================= */
+
+async function addComment(
+    mediaId,
+    text,
+    parentCommentId,
+    inputElement,
+    buttonElement
+) {
+
+    const commentText =
+        String(
+            text || ""
+        ).trim();
+
+
+    if (
+        !commentText ||
+        !currentUser
+    ) {
+
+        return;
+    }
+
+
+    buttonElement.disabled =
+        true;
+
+
+    buttonElement.textContent =
+        parentCommentId
+            ? "Replying..."
+            : "Posting...";
+
+
+    try {
+
+        const {
+            error
+        } =
+            await supabaseClient
+
+                .from(
+                    "comments"
+                )
+
+                .insert({
+
+                    media_id:
+                        mediaId,
+
+                    user_id:
+                        currentUser.id,
+
+                    comment_text:
+                        commentText,
+
+                    parent_comment_id:
+                        parentCommentId ||
+                        null
+
+                });
+
+
+        if (
+            error
+        ) {
+
+            throw error;
+        }
+
+
+        inputElement.value =
+            "";
+
+
+        await loadMemories();
+
+    } catch (
+        error
+    ) {
+
+        console.error(
+            "Comment error:",
+            error
+        );
+
+
+        alert(
+            error?.message ||
+            "Couldn't post the comment."
+        );
+
+    } finally {
+
+        buttonElement.disabled =
+            false;
+
+
+        buttonElement.textContent =
+            parentCommentId
+                ? "Reply"
+                : "Post";
+    }
+}
+
+
+/* =========================================================
    EDIT COMMENT
-========================================= */
+========================================================= */
 
 async function startEditComment(
     comment,
@@ -3379,22 +3761,14 @@ async function startEditComment(
         "Cancel";
 
 
-    controls.appendChild(
-        saveButton
-    );
-
-
-    controls.appendChild(
+    controls.append(
+        saveButton,
         cancelButton
     );
 
 
-    editArea.appendChild(
-        input
-    );
-
-
-    editArea.appendChild(
+    editArea.append(
+        input,
         controls
     );
 
@@ -3422,7 +3796,6 @@ async function startEditComment(
 
             existingText.style.display =
                 "";
-
         }
     );
 
@@ -3514,7 +3887,6 @@ async function startEditComment(
 
                 await loadMemories();
 
-
             } catch (
                 error
             ) {
@@ -3543,22 +3915,18 @@ async function startEditComment(
 }
 
 
-/* =========================================
+/* =========================================================
    DELETE COMMENT
-========================================= */
+========================================================= */
 
 async function deleteComment(
     commentId
 ) {
 
-    const confirmed =
-        window.confirm(
-            "Delete this comment?"
-        );
-
-
     if (
-        !confirmed
+        !window.confirm(
+            "Delete this comment?"
+        )
     ) {
 
         return;
@@ -3599,7 +3967,6 @@ async function deleteComment(
 
         await loadMemories();
 
-
     } catch (
         error
     ) {
@@ -3618,155 +3985,9 @@ async function deleteComment(
 }
 
 
-/* =========================================
-   ADD COMMENT
-========================================= */
-
-async function addComment(
-    mediaId,
-    text,
-    parentCommentId,
-    inputElement,
-    buttonElement
-) {
-
-    const commentText =
-        text.trim();
-
-
-    if (
-        !commentText
-    ) {
-
-        return;
-    }
-
-
-    if (
-        !currentUser
-    ) {
-
-        console.error(
-            "No authenticated user."
-        );
-
-
-        return;
-    }
-
-
-    buttonElement.disabled =
-        true;
-
-
-    buttonElement.textContent =
-        parentCommentId
-            ? "Replying..."
-            : "Posting...";
-
-
-    try {
-
-        const {
-            error
-        } =
-            await supabaseClient
-
-                .from(
-                    "comments"
-                )
-
-                .insert({
-
-                    media_id:
-                        mediaId,
-
-                    user_id:
-                        currentUser.id,
-
-                    comment_text:
-                        commentText,
-
-                    parent_comment_id:
-                        parentCommentId ||
-                        null
-
-                });
-
-
-        if (
-            error
-        ) {
-
-            throw error;
-        }
-
-
-        inputElement.value =
-            "";
-
-
-        await loadMemories();
-
-
-    } catch (
-        error
-    ) {
-
-        console.error(
-            "Comment error:",
-            error
-        );
-
-
-        alert(
-            error?.message ||
-            "Couldn't post the comment."
-        );
-
-
-    } finally {
-
-        buttonElement.disabled =
-            false;
-
-
-        buttonElement.textContent =
-            parentCommentId
-                ? "Reply"
-                : "Post";
-    }
-}
-
-
-/* =========================================
-   COMMENT AUTHOR
-========================================= */
-
-function getCommentAuthor(
-    userId
-) {
-
-    if (
-
-        currentUser &&
-
-        userId ===
-            currentUser.id
-
-    ) {
-
-        return "You";
-    }
-
-
-    return "Your love ❤️";
-}
-
-
-/* =========================================
-   EDIT MODAL
-========================================= */
+/* =========================================================
+   MEMORY EDIT MODAL
+========================================================= */
 
 function openEditModal(
     memory
@@ -3809,14 +4030,12 @@ function openEditModal(
 
 
     if (
-
         !modal ||
         !titleInput ||
         !dateInput ||
         !descriptionInput ||
         !message ||
         !saveButton
-
     ) {
 
         console.error(
@@ -3872,10 +4091,6 @@ function openEditModal(
 }
 
 
-/* =========================================
-   CLOSE EDIT MODAL
-========================================= */
-
 function closeEditModal() {
 
     const modal =
@@ -3884,7 +4099,9 @@ function closeEditModal() {
         );
 
 
-    if (!modal) {
+    if (
+        !modal
+    ) {
 
         return;
     }
@@ -3904,20 +4121,11 @@ function closeEditModal() {
 }
 
 
-/* =========================================
-   UPDATE MEMORY
-========================================= */
-
 async function updateMemory() {
 
     if (
         !currentEditingMemory
     ) {
-
-        console.error(
-            "No memory selected for editing."
-        );
-
 
         return;
     }
@@ -4055,7 +4263,6 @@ async function updateMemory() {
 
         await loadMemories();
 
-
     } catch (
         error
     ) {
@@ -4067,6 +4274,7 @@ async function updateMemory() {
 
 
         message.textContent =
+            error?.message ||
             "Couldn't save the changes.";
 
 
@@ -4080,26 +4288,22 @@ async function updateMemory() {
 }
 
 
-/* =========================================
+/* =========================================================
    DELETE MEMORY
-========================================= */
+========================================================= */
 
 async function deleteMemory(
     memory
 ) {
 
-    const confirmed =
-        window.confirm(
+    if (
+        !window.confirm(
 
             `Delete "${memory.title}"?` +
 
             `\n\nThis will permanently delete the memory and all of its photos/videos.`
 
-        );
-
-
-    if (
-        !confirmed
+        )
     ) {
 
         return;
@@ -4107,8 +4311,6 @@ async function deleteMemory(
 
 
     try {
-
-        /* GET MEDIA */
 
         const {
             data:
@@ -4142,14 +4344,8 @@ async function deleteMemory(
         }
 
 
-        /* DELETE STORAGE */
-
         if (
-
-            mediaItems &&
-
-            mediaItems.length > 0
-
+            mediaItems?.length
         ) {
 
             const paths =
@@ -4164,6 +4360,7 @@ async function deleteMemory(
             const {
                 error:
                     storageError
+
             } =
                 await supabaseClient
 
@@ -4184,20 +4381,9 @@ async function deleteMemory(
 
                 throw storageError;
             }
-        }
 
 
-        /* DELETE COMMENTS */
-
-        if (
-
-            mediaItems &&
-
-            mediaItems.length > 0
-
-        ) {
-
-            const mediaIdsForDelete =
+            const mediaIds =
                 mediaItems.map(
                     (
                         item
@@ -4208,7 +4394,8 @@ async function deleteMemory(
 
             const {
                 error:
-                    commentsDeleteError
+                    commentsError
+
             } =
                 await supabaseClient
 
@@ -4220,24 +4407,23 @@ async function deleteMemory(
 
                     .in(
                         "media_id",
-                        mediaIdsForDelete
+                        mediaIds
                     );
 
 
             if (
-                commentsDeleteError
+                commentsError
             ) {
 
-                throw commentsDeleteError;
+                throw commentsError;
             }
         }
 
 
-        /* DELETE MEDIA */
-
         const {
             error:
                 mediaDeleteError
+
         } =
             await supabaseClient
 
@@ -4261,11 +4447,10 @@ async function deleteMemory(
         }
 
 
-        /* DELETE MEMORY */
-
         const {
             error:
                 memoryDeleteError
+
         } =
             await supabaseClient
 
@@ -4291,7 +4476,6 @@ async function deleteMemory(
 
         await loadMemories();
 
-
     } catch (
         error
     ) {
@@ -4303,121 +4487,26 @@ async function deleteMemory(
 
 
         alert(
+            error?.message ||
             "Something went wrong while deleting this memory."
         );
     }
 }
 
 
-/* =========================================
-   FORMAT DATE
-========================================= */
+/* =========================================================
+   SEARCH
+========================================================= */
 
-function formatMemoryDate(
-    dateString
-) {
+function setupSearch() {
 
-    const date =
-        new Date(
-            `${dateString}T00:00:00`
-        );
-
-
-    return date.toLocaleDateString(
-        "en-IN",
-        {
-
-            day:
-                "numeric",
-
-            month:
-                "long",
-
-            year:
-                "numeric"
-
-        }
-    );
-}
-
-
-/* =========================================
-   ESCAPE HTML
-========================================= */
-
-function escapeHtml(
-    value
-) {
-
-    return String(
-        value
-    )
-
-        .replaceAll(
-            "&",
-            "&amp;"
-        )
-
-        .replaceAll(
-            "<",
-            "&lt;"
-        )
-
-        .replaceAll(
-            ">",
-            "&gt;"
-        )
-
-        .replaceAll(
-            '"',
-            "&quot;"
-        )
-
-        .replaceAll(
-            "'",
-            "&#039;"
-        );
-}
-
-
-function escapeIlikePattern(
-    value
-) {
-
-    return String(
-        value
-    )
-
-        .replaceAll(
-            "\\",
-            "\\\\"
-        )
-
-        .replaceAll(
-            "%",
-            "\\%"
-        )
-
-        .replaceAll(
-            "_",
-            "\\_"
-        );
-}
-
-
-/* =========================================
-   EVENT LISTENERS
-========================================= */
-
-function setupEventListeners() {
-
-    const memorySearchInput =
+    const searchInput =
         document.getElementById(
             "memorySearchInput"
         );
 
 
-    const clearSearchButton =
+    const clearButton =
         document.getElementById(
             "clearSearchButton"
         );
@@ -4427,13 +4516,11 @@ function setupEventListeners() {
         null;
 
 
-    /* SEARCH */
-
     if (
-        memorySearchInput
+        searchInput
     ) {
 
-        memorySearchInput.addEventListener(
+        searchInput.addEventListener(
             "input",
             () => {
 
@@ -4443,63 +4530,48 @@ function setupEventListeners() {
 
 
                 const value =
-                    memorySearchInput
-                        .value
-                        .trim();
+                    searchInput.value.trim();
 
 
-                if (
-                    clearSearchButton
-                ) {
-
-                    clearSearchButton.classList.toggle(
-
-                        "hidden",
-
-                        value.length ===
-                            0
-
-                    );
-                }
+                clearButton?.classList.toggle(
+                    "hidden",
+                    value.length ===
+                        0
+                );
 
 
                 searchTimeout =
                     setTimeout(
+                        () => {
 
-                        async () => {
-
-                            await loadMemories();
+                            loadMemories();
 
                         },
-
                         300
-
                     );
             }
         );
     }
 
 
-    /* CLEAR SEARCH */
-
     if (
-        clearSearchButton
+        clearButton
     ) {
 
-        clearSearchButton.addEventListener(
+        clearButton.addEventListener(
             "click",
             async () => {
 
                 if (
-                    memorySearchInput
+                    searchInput
                 ) {
 
-                    memorySearchInput.value =
+                    searchInput.value =
                         "";
                 }
 
 
-                clearSearchButton.classList.add(
+                clearButton.classList.add(
                     "hidden"
                 );
 
@@ -4507,75 +4579,61 @@ function setupEventListeners() {
                 await loadMemories();
 
 
-                if (
-                    memorySearchInput
-                ) {
-
-                    memorySearchInput.focus();
-                }
+                searchInput?.focus();
             }
         );
     }
+}
 
 
-    /* LOGOUT */
+/* =========================================================
+   EVENT LISTENERS
+========================================================= */
 
-    const logoutButton =
-        document.getElementById(
+function setupEventListeners() {
+
+    setupSearch();
+
+
+    document
+        .getElementById(
             "logoutButton"
-        );
-
-
-    if (
-        logoutButton
-    ) {
-
-        logoutButton.addEventListener(
+        )
+        ?.addEventListener(
             "click",
             logout
         );
-    }
 
 
-    /* OPEN UPLOAD */
-
-    const openUploadButton =
-        document.getElementById(
+    document
+        .getElementById(
             "openUploadButton"
-        );
-
-
-    if (
-        openUploadButton
-    ) {
-
-        openUploadButton.addEventListener(
+        )
+        ?.addEventListener(
             "click",
             openModal
         );
-    }
 
 
-    /* CLOSE UPLOAD */
-
-    const closeUploadButton =
-        document.getElementById(
+    document
+        .getElementById(
             "closeUploadButton"
-        );
-
-
-    if (
-        closeUploadButton
-    ) {
-
-        closeUploadButton.addEventListener(
+        )
+        ?.addEventListener(
             "click",
             closeModal
         );
-    }
 
 
-    /* CLICK OUTSIDE UPLOAD */
+    document
+        .getElementById(
+            "saveMemoryButton"
+        )
+        ?.addEventListener(
+            "click",
+            createMemory
+        );
+
 
     const uploadModal =
         document.getElementById(
@@ -4605,8 +4663,6 @@ function setupEventListeners() {
     }
 
 
-    /* DROP ZONE */
-
     const dropZone =
         document.getElementById(
             "dropZone"
@@ -4627,12 +4683,7 @@ function setupEventListeners() {
             "click",
             () => {
 
-                if (
-                    mediaInput
-                ) {
-
-                    mediaInput.click();
-                }
+                mediaInput?.click();
             }
         );
 
@@ -4678,20 +4729,16 @@ function setupEventListeners() {
                 );
 
 
-                if (
-                    event.dataTransfer
-                ) {
-
-                    addFiles(
-                        event.dataTransfer.files
-                    );
-                }
+                addFiles(
+                    event
+                        .dataTransfer
+                        ?.files ||
+                    []
+                );
             }
         );
     }
 
-
-    /* FILE INPUT */
 
     if (
         mediaInput
@@ -4702,57 +4749,19 @@ function setupEventListeners() {
             () => {
 
                 addFiles(
-                    mediaInput.files
+                    mediaInput.files ||
+                    []
                 );
             }
         );
     }
 
 
-    /* SAVE MEMORY */
-
-    const saveMemoryButton =
-        document.getElementById(
-            "saveMemoryButton"
-        );
-
-
-    if (
-        saveMemoryButton
-    ) {
-
-        saveMemoryButton.addEventListener(
-            "click",
-            createMemory
-        );
-    }
-
-
-    /* EDIT MODAL */
-
-    const closeEditButton =
-        document.getElementById(
+    document
+        .getElementById(
             "closeEditButton"
-        );
-
-
-    const saveEditButton =
-        document.getElementById(
-            "saveEditButton"
-        );
-
-
-    const editModal =
-        document.getElementById(
-            "editModal"
-        );
-
-
-    if (
-        closeEditButton
-    ) {
-
-        closeEditButton.addEventListener(
+        )
+        ?.addEventListener(
             "click",
             (
                 event
@@ -4764,14 +4773,13 @@ function setupEventListeners() {
                 closeEditModal();
             }
         );
-    }
 
 
-    if (
-        saveEditButton
-    ) {
-
-        saveEditButton.addEventListener(
+    document
+        .getElementById(
+            "saveEditButton"
+        )
+        ?.addEventListener(
             "click",
             (
                 event
@@ -4783,7 +4791,12 @@ function setupEventListeners() {
                 updateMemory();
             }
         );
-    }
+
+
+    const editModal =
+        document.getElementById(
+            "editModal"
+        );
 
 
     if (
@@ -4809,9 +4822,9 @@ function setupEventListeners() {
 }
 
 
-/* =========================================
-   START APPLICATION
-========================================= */
+/* =========================================================
+   INITIALIZE
+========================================================= */
 
 async function initializeApp() {
 
@@ -4836,9 +4849,5 @@ async function initializeApp() {
     await loadMemories();
 }
 
-
-/* =========================================
-   START
-========================================= */
 
 initializeApp();
