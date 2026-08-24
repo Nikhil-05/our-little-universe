@@ -1,0 +1,12 @@
+OUR LITTLE UNIVERSE - COUPLE QUIZ FIX
+
+1. Extract this project.
+2. In Supabase SQL Editor, run couple_quiz.sql completely.
+   If you previously created an older Couple Quiz schema and this SQL reports column/table conflicts, stop and send the exact SQL error before dropping anything. Do NOT delete your existing quiz data blindly.
+3. Run: npm install
+4. Run: npm run dev
+5. Open the local app while logged in.
+
+This revision fixes the accidental Couple Quiz block that had been inserted inside the memory search markup. The Couple Quiz now appears only as the existing button and its modal/gate. The main app logic in js/app.js is unchanged.
+
+If the quiz modal still says the database setup is missing, open DevTools Console and the UI will now provide a specific setup error (for example missing RPC/table) rather than only the generic message.

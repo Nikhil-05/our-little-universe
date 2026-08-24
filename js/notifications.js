@@ -139,6 +139,14 @@ function getNotificationIcon(
             return "✏️";
 
 
+        case "quiz_incorrect_answer":
+            return "❓";
+
+
+        case "quiz_answered":
+            return "💕";
+
+
         default:
             return "❤️";
     }
@@ -298,6 +306,7 @@ async function loadNotifications() {
                 memory_id,
                 media_id,
                 comment_id,
+                quiz_question_id,
                 is_read,
                 created_at
             `)
@@ -533,6 +542,33 @@ function createNotificationElement(
             await markNotificationRead(
                 notification.id
             );
+
+
+            /*
+             * COUPLE QUIZ TARGET
+             */
+
+            if (
+                notification.quiz_question_id
+            ) {
+
+                const appUrl =
+                    new URL(
+                        "./app.html",
+                        window.location.href
+                    );
+
+
+                appUrl.hash =
+                    `quiz-question-${notification.quiz_question_id}`;
+
+
+                window.location.href =
+                    appUrl.href;
+
+
+                return;
+            }
 
 
             /*
