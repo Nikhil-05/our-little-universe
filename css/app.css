@@ -2664,3 +2664,133 @@ body {
     }
 
 }
+
+/* =========================================================
+   COUPLE QUIZ — QUESTION TYPE
+========================================================= */
+
+.couple-quiz-question-type {
+    width: 100%;
+    min-height: 48px;
+    padding: 12px 14px;
+    margin: 8px 0 18px;
+
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 14px;
+
+    background: rgba(255, 255, 255, 0.06);
+    color: inherit;
+
+    font-size: 15px;
+    font-weight: 600;
+
+    outline: none;
+
+    cursor: pointer;
+
+    transition:
+        border-color 0.2s ease,
+        background 0.2s ease;
+}
+
+.couple-quiz-question-type:focus {
+    border-color: rgba(255, 120, 160, 0.7);
+    background: rgba(255, 255, 255, 0.09);
+}
+
+
+/* =========================================================
+   TEXT ANSWER
+========================================================= */
+
+.couple-quiz-text-answer-wrap {
+    width: 100%;
+    margin: 14px 0;
+}
+
+.couple-quiz-text-answer {
+    width: 100%;
+    min-height: 50px;
+
+    box-sizing: border-box;
+
+    padding: 13px 15px;
+
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 14px;
+
+    background: rgba(255, 255, 255, 0.06);
+    color: inherit;
+
+    font-size: 16px;
+    font-weight: 600;
+
+    outline: none;
+
+    transition:
+        border-color 0.2s ease,
+        box-shadow 0.2s ease,
+        background 0.2s ease;
+}
+
+.couple-quiz-text-answer:focus {
+    border-color: rgba(255, 120, 160, 0.75);
+
+    box-shadow:
+        0 0 0 3px rgba(255, 120, 160, 0.12);
+
+    background: rgba(255, 255, 255, 0.09);
+}
+
+.couple-quiz-text-answer::placeholder {
+    opacity: 0.55;
+}
+
+.couple-quiz-text-hint {
+    margin: 8px 2px 0;
+
+    font-size: 12px;
+    line-height: 1.4;
+
+    opacity: 0.65;
+}
+
+
+/* =========================================================
+   QUESTION TYPE BADGE
+========================================================= */
+
+.couple-quiz-type-badge {
+    display: inline-flex;
+
+    align-items: center;
+    justify-content: center;
+
+    width: fit-content;
+
+    margin: 12px 0 18px;
+    padding: 6px 10px;
+
+    border-radius: 999px;
+
+    background: rgba(255, 120, 160, 0.12);
+
+    font-size: 12px;
+    font-weight: 700;
+
+    opacity: 0.85;
+}
+
+
+/* =========================================================
+   MOBILE
+========================================================= */
+
+@media (max-width: 600px) {
+
+    .couple-quiz-question-type,
+    .couple-quiz-text-answer {
+        font-size: 16px;
+    }
+
+}

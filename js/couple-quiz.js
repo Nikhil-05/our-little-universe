@@ -1,33 +1,51 @@
+/* =========================================================
+   OUR LITTLE UNIVERSE
+   COUPLE QUIZ
+
+   Supported question types:
+   1. mcq  - multiple choice, one or more correct answers
+   2. text - one-word text answer, case insensitive
+========================================================= */
+
 let coupleQuizSupabase = null;
 let coupleQuizSession = null;
 let coupleQuizPendingQuestion = null;
+
 let coupleQuizInitialized = false;
 let coupleQuizListenersReady = false;
 let coupleQuizAuthListenerReady = false;
 
 
 /* =========================================================
-   SUPABASE CLIENT
-   ========================================================= */
+   SUPABASE
+========================================================= */
 
 function ensureCoupleQuizClient() {
-    if (coupleQuizSupabase) return coupleQuizSupabase;
+
+    if (coupleQuizSupabase) {
+        return coupleQuizSupabase;
+    }
 
     if (!window.supabase?.createClient) {
-        throw new Error("Supabase client library is not loaded.");
+        throw new Error(
+            "Supabase client library is not loaded."
+        );
     }
 
     if (
         typeof SUPABASE_URL === "undefined" ||
         typeof SUPABASE_KEY === "undefined"
     ) {
-        throw new Error("Supabase configuration is not loaded.");
+        throw new Error(
+            "Supabase configuration is not loaded."
+        );
     }
 
-    coupleQuizSupabase = window.supabase.createClient(
-        SUPABASE_URL,
-        SUPABASE_KEY
-    );
+    coupleQuizSupabase =
+        window.supabase.createClient(
+            SUPABASE_URL,
+            SUPABASE_KEY
+        );
 
     return coupleQuizSupabase;
 }
@@ -35,7 +53,7 @@ function ensureCoupleQuizClient() {
 
 /* =========================================================
    HELPERS
-   ========================================================= */
+========================================================= */
 
 function quizEl(id) {
     return document.getElementById(id);
@@ -43,23 +61,108 @@ function quizEl(id) {
 
 
 function quizEscape(value) {
-    const div = document.createElement("div");
+
+    const div =
+        document.createElement("div");
 
     div.textContent =
-        value == null ? "" : String(value);
+        value == null
+            ? ""
+            : String(value);
 
     return div.innerHTML;
 }
 
 
+function normalizeQuizOptions(options) {
+
+    if (Array.isArray(options)) {
+
+        return options
+            .map(option => {
+
+                if (
+                    !option ||
+                    typeof option !== "object"
+                ) {
+                    return null;
+                }
+
+                return {
+                    id: String(
+                        option.id ?? ""
+                    ),
+                    text: String(
+                        option.text ??
+                        option.label ??
+                        option.value ??
+                        ""
+                    )
+                };
+            })
+            .filter(
+                option =>
+                    option &&
+                    option.id &&
+                    option.text
+            );
+    }
+
+
+    if (
+        options &&
+        typeof options === "object"
+    ) {
+
+        return Object.entries(options)
+            .map(([id, value]) => {
+
+                if (
+                    value &&
+                    typeof value === "object"
+                ) {
+                    return {
+                        id: String(
+                            value.id ?? id
+                        ),
+                        text: String(
+                            value.text ??
+                            value.label ??
+                            value.value ??
+                            ""
+                        )
+                    };
+                }
+
+                return {
+                    id: String(id),
+                    text: String(value)
+                };
+            })
+            .filter(
+                option =>
+                    option.id &&
+                    option.text
+            );
+    }
+
+
+    return [];
+}
+
+
 /* =========================================================
    MODAL / GATE
-   ========================================================= */
+========================================================= */
 
 function setQuizModalOpen(open) {
-    const modal = quizEl("coupleQuizModal");
 
-    if (!modal) return;
+    const modal =
+        quizEl("coupleQuizModal");
+
+    if (!modal) {
+        return;
+    }
 
     modal.classList.toggle(
         "hidden",
@@ -79,9 +182,13 @@ function setQuizModalOpen(open) {
 
 
 function setQuizGateOpen(open) {
-    const gate = quizEl("coupleQuizGate");
 
-    if (!gate) return;
+    const gate =
+        quizEl("coupleQuizGate");
+
+    if (!gate) {
+        return;
+    }
 
     gate.classList.toggle(
         "hidden",
@@ -99,21 +206,25 @@ function setQuizGateOpen(open) {
     );
 
     document.body.style.overflow =
-        open ? "hidden" : "";
+        open
+            ? "hidden"
+            : "";
 }
 
 
 /* =========================================================
    AUTH
-   ========================================================= */
+========================================================= */
 
 async function getQuizSession() {
+
     ensureCoupleQuizClient();
 
     const {
         data,
         error
-    } = await coupleQuizSupabase.auth.getSession();
+    } =
+        await coupleQuizSupabase.auth.getSession();
 
     if (error) {
         throw error;
@@ -123,33 +234,30 @@ async function getQuizSession() {
 }
 
 
-async function syncQuizSession() {
-    coupleQuizSession =
-        await getQuizSession();
-
-    return coupleQuizSession;
-}
-
-
 /* =========================================================
    ERROR HANDLING
-   ========================================================= */
+========================================================= */
 
 function getQuizErrorMessage(error) {
+
     const code =
         error?.code || "";
 
     const message =
-        String(error?.message || "");
+        String(
+            error?.message || ""
+        );
 
 
     if (
         code === "PGRST202" ||
         code === "42883" ||
-        /get_couple_quiz_state/i.test(message) ||
         /function .* does not exist/i.test(message)
     ) {
-        return "Couple Quiz database setup is missing. Please check the Couple Quiz SQL functions in Supabase.";
+        return (
+            "Couple Quiz database setup is incomplete. " +
+            "Please check the Couple Quiz SQL."
+        );
     }
 
 
@@ -157,28 +265,33 @@ function getQuizErrorMessage(error) {
         code === "42P01" ||
         /relation .*couple_quiz/i.test(message)
     ) {
-        return "Couple Quiz tables are missing. Please check the Couple Quiz database setup.";
+        return (
+            "Couple Quiz tables are missing."
+        );
     }
 
 
     if (
-        /authentication required/i.test(message)
+        /authentication required/i.test(
+            message
+        )
     ) {
-        return "Your login session is not ready yet. Please refresh the page.";
+        return (
+            "Your login session is not ready yet. " +
+            "Please refresh the page."
+        );
     }
 
 
     if (
-        /p_correct_answers/i.test(message)
+        /already have an unanswered couple quiz question/i.test(
+            message
+        )
     ) {
-        return "Couple Quiz configuration mismatch. The question creation function expects p_correct_option_ids.";
-    }
-
-
-    if (
-        /already have an unanswered couple quiz question/i.test(message)
-    ) {
-        return "You already have an unanswered Couple Quiz question. Answer your love's question first. ❤️";
+        return (
+            "You already have an unanswered Couple Quiz question. " +
+            "Answer your love's question first. ❤️"
+        );
     }
 
 
@@ -190,132 +303,36 @@ function getQuizErrorMessage(error) {
 
 
 /* =========================================================
-   GET QUIZ STATE
-   ========================================================= */
+   STATE
+========================================================= */
 
 async function getCoupleQuizState() {
+
     ensureCoupleQuizClient();
 
     const {
         data,
         error
-    } = await coupleQuizSupabase.rpc(
-        "get_couple_quiz_state"
-    );
+    } =
+        await coupleQuizSupabase.rpc(
+            "get_couple_quiz_state"
+        );
 
     if (error) {
         throw error;
     }
 
-    const state = data || {};
-
-    let pendingQuestion = null;
-    let myActiveQuestion = null;
-
-
-    /*
-     * =========================================================
-     * PARTNER QUESTION
-     *
-     * get_couple_quiz_state() gives us the question ID.
-     * The existing get_couple_quiz_question RPC does NOT
-     * accept p_question_id, so fetch the row directly.
-     * =========================================================
-     */
-
-    if (
-        state.partner_question_id &&
-        state.must_answer_question === true
-    ) {
-
-        const {
-            data: partnerQuestion,
-            error: partnerQuestionError
-        } =
-            await coupleQuizSupabase
-                .from("couple_quiz_questions")
-                .select(
-                    "id, question_text, options, question_date, created_by, is_active, is_answered, answered_at, answered_by"
-                )
-                .eq(
-                    "id",
-                    state.partner_question_id
-                )
-                .maybeSingle();
-
-        if (partnerQuestionError) {
-            console.error(
-                "[COUPLE QUIZ] Failed to load partner question:",
-                partnerQuestionError
-            );
-
-            throw partnerQuestionError;
-        }
-
-        pendingQuestion =
-            partnerQuestion || null;
-    }
-
-
-    /*
-     * =========================================================
-     * MY QUESTION
-     * =========================================================
-     */
-
-    if (
-        state.my_question_id &&
-        state.has_my_unanswered_question === true
-    ) {
-
-        const {
-            data: ownQuestion,
-            error: ownQuestionError
-        } =
-            await coupleQuizSupabase
-                .from("couple_quiz_questions")
-                .select(
-                    "id, question_text, options, question_date, created_by, is_active, is_answered, answered_at, answered_by"
-                )
-                .eq(
-                    "id",
-                    state.my_question_id
-                )
-                .maybeSingle();
-
-        if (ownQuestionError) {
-            console.error(
-                "[COUPLE QUIZ] Failed to load own question:",
-                ownQuestionError
-            );
-
-            throw ownQuestionError;
-        }
-
-        myActiveQuestion =
-            ownQuestion || null;
-    }
-
-
-    /*
-     * =========================================================
-     * RETURN NORMALIZED STATE
-     * =========================================================
-     */
-
-    return {
-        ...state,
-
-        pending_question:
-            pendingQuestion,
-
-        my_active_question:
-            myActiveQuestion
+    return data || {
+        pending_question: null,
+        my_active_question: null,
+        can_add_question: true
     };
 }
+
+
 /* =========================================================
    INITIALIZE
-   ========================================================= */
+========================================================= */
 
 async function initializeCoupleQuiz() {
 
@@ -350,21 +367,29 @@ async function initializeCoupleQuiz() {
             error
         );
 
-        closeQuizGateSafely();
+        setQuizGateOpen(false);
     }
 }
 
 
+async function syncQuizSession() {
+
+    coupleQuizSession =
+        await getQuizSession();
+
+    return coupleQuizSession;
+}
+
+
 /* =========================================================
-   REFRESH QUIZ
-   ========================================================= */
+   REFRESH
+========================================================= */
 
 async function refreshCoupleQuiz() {
 
     try {
 
         await syncQuizSession();
-
 
         if (!coupleQuizSession) {
 
@@ -385,14 +410,6 @@ async function refreshCoupleQuiz() {
         const state =
             await getCoupleQuizState();
 
-
-        /*
-         * VERY IMPORTANT:
-         *
-         * pending_question belongs to the
-         * CURRENT USER and must always take
-         * priority over my_active_question.
-         */
 
         coupleQuizPendingQuestion =
             state?.pending_question || null;
@@ -434,8 +451,8 @@ async function refreshCoupleQuiz() {
 
 
 /* =========================================================
-   QUIZ BUTTON
-   ========================================================= */
+   BUTTON
+========================================================= */
 
 function updateQuizButton(state) {
 
@@ -449,13 +466,7 @@ function updateQuizButton(state) {
     }
 
 
-    /*
-     * Partner's question has priority.
-     */
-
-    if (
-        state?.pending_question
-    ) {
+    if (state?.pending_question) {
 
         button.textContent =
             "💕 Answer Your Love";
@@ -471,14 +482,7 @@ function updateQuizButton(state) {
     }
 
 
-    /*
-     * Own question is waiting
-     * for partner.
-     */
-
-    if (
-        state?.my_active_question
-    ) {
+    if (state?.my_active_question) {
 
         button.textContent =
             "💕 Question Pending";
@@ -508,7 +512,7 @@ function updateQuizButton(state) {
 
 /* =========================================================
    EVENT LISTENERS
-   ========================================================= */
+========================================================= */
 
 function setupCoupleQuizListeners() {
 
@@ -547,11 +551,8 @@ function setupCoupleQuizListeners() {
 
             if (
                 event.target ===
-                quizEl(
-                    "coupleQuizModal"
-                )
+                quizEl("coupleQuizModal")
             ) {
-
                 setQuizModalOpen(false);
             }
         }
@@ -574,11 +575,8 @@ function setupCoupleQuizListeners() {
 
             if (
                 event.target ===
-                quizEl(
-                    "coupleQuizGate"
-                )
+                quizEl("coupleQuizGate")
             ) {
-
                 event.preventDefault();
             }
         }
@@ -596,12 +594,10 @@ function setupCoupleQuizListeners() {
                 return;
             }
 
-
             const gate =
                 quizEl(
                     "coupleQuizGate"
                 );
-
 
             if (
                 gate &&
@@ -609,7 +605,6 @@ function setupCoupleQuizListeners() {
                     "hidden"
                 )
             ) {
-
                 event.preventDefault();
             }
         }
@@ -624,7 +619,6 @@ function setupCoupleQuizListeners() {
                 document.visibilityState ===
                 "visible"
             ) {
-
                 await refreshCoupleQuiz();
             }
         }
@@ -633,8 +627,8 @@ function setupCoupleQuizListeners() {
 
 
 /* =========================================================
-   AUTH STATE LISTENER
-   ========================================================= */
+   AUTH LISTENER
+========================================================= */
 
 function setupCoupleQuizAuthListener() {
 
@@ -650,88 +644,95 @@ function setupCoupleQuizAuthListener() {
     ensureCoupleQuizClient();
 
 
-    coupleQuizSupabase.auth.onAuthStateChange(
-        (
-            event,
-            session
-        ) => {
+    coupleQuizSupabase.auth
+        .onAuthStateChange(
+            (event, session) => {
 
-            setTimeout(
-                async () => {
+                setTimeout(
+                    async () => {
 
-                    try {
+                        try {
 
-                        coupleQuizSession =
-                            session || null;
+                            coupleQuizSession =
+                                session || null;
 
 
-                        if (
-                            !coupleQuizSession
-                        ) {
+                            if (
+                                !coupleQuizSession
+                            ) {
 
-                            coupleQuizPendingQuestion =
-                                null;
+                                coupleQuizPendingQuestion =
+                                    null;
 
-                            setQuizGateOpen(
-                                false
+                                setQuizGateOpen(
+                                    false
+                                );
+
+                                setQuizModalOpen(
+                                    false
+                                );
+
+                                return;
+                            }
+
+
+                            await refreshCoupleQuiz();
+
+
+                            if (
+                                event ===
+                                    "SIGNED_IN" ||
+                                event ===
+                                    "TOKEN_REFRESHED"
+                            ) {
+
+                                await focusQuizNotificationHash();
+                            }
+
+                        } catch (error) {
+
+                            console.error(
+                                "Couple Quiz auth sync error:",
+                                error
                             );
-
-                            setQuizModalOpen(
-                                false
-                            );
-
-                            updateQuizButton({
-                                pending_question: null,
-                                my_active_question: null
-                            });
-
-                            return;
                         }
 
-
-                        await refreshCoupleQuiz();
-
-
-                        if (
-                            event === "SIGNED_IN" ||
-                            event === "TOKEN_REFRESHED"
-                        ) {
-
-                            await focusQuizNotificationHash();
-                        }
-
-                    } catch (error) {
-
-                        console.error(
-                            "Couple Quiz auth sync error:",
-                            error
-                        );
-                    }
-
-                },
-                0
-            );
-        }
-    );
+                    },
+                    0
+                );
+            }
+        );
 }
 
 
 /* =========================================================
-   RENDER GATE QUESTION
-   ========================================================= */
+   RENDER GATE
+========================================================= */
 
-function renderGateQuestion(question) {
+function renderGateQuestion(
+    question
+) {
+
     const questionElement =
-        quizEl("coupleQuizGateQuestion");
+        quizEl(
+            "coupleQuizGateQuestion"
+        );
 
     const optionsElement =
-        quizEl("coupleQuizGateOptions");
+        quizEl(
+            "coupleQuizGateOptions"
+        );
 
     const messageElement =
-        quizEl("coupleQuizGateMessage");
+        quizEl(
+            "coupleQuizGateMessage"
+        );
 
     const submitButton =
-        quizEl("submitCoupleQuizAnswerButton");
+        quizEl(
+            "submitCoupleQuizAnswerButton"
+        );
+
 
     if (
         !questionElement ||
@@ -741,146 +742,32 @@ function renderGateQuestion(question) {
         return;
     }
 
+
     questionElement.textContent =
         question?.question_text || "";
 
-    optionsElement.innerHTML = "";
 
-    const rawOptions =
-        question?.options || [];
+    optionsElement.innerHTML =
+        "";
 
-    /*
-     * IMPORTANT:
-     *
-     * Supabase currently stores options like:
-     *
-     * [
-     *   { id: "A", text: "test1" },
-     *   { id: "B", text: "test2" },
-     *   { id: "C", text: "test3" },
-     *   { id: "D", text: "test4" }
-     * ]
-     *
-     * Older questions may also use:
-     *
-     * {
-     *   A: "test1",
-     *   B: "test2",
-     *   C: "test3",
-     *   D: "test4"
-     * }
-     *
-     * Normalize both formats here.
-     */
 
-    let normalizedOptions = [];
-
-    if (Array.isArray(rawOptions)) {
-
-        normalizedOptions =
-            rawOptions
-                .map(option => {
-
-                    if (
-                        option &&
-                        typeof option === "object"
-                    ) {
-                        return {
-                            id: String(
-                                option.id ?? ""
-                            ),
-                            text: String(
-                                option.text ?? ""
-                            )
-                        };
-                    }
-
-                    return null;
-                })
-                .filter(
-                    option =>
-                        option &&
-                        option.id &&
-                        option.text
-                );
-
-    } else if (
-        rawOptions &&
-        typeof rawOptions === "object"
+    if (
+        question?.question_type ===
+        "text"
     ) {
 
-        normalizedOptions =
-            Object.entries(rawOptions)
-                .map(
-                    ([id, text]) => ({
-                        id: String(id),
-                        text: String(text)
-                    })
-                );
+        renderTextAnswerInput(
+            optionsElement
+        );
+
+    } else {
+
+        renderMcqOptions(
+            question,
+            optionsElement
+        );
     }
 
-    normalizedOptions.forEach(
-        ({ id, text }) => {
-
-            const label =
-                document.createElement("label");
-
-            label.className =
-                "couple-quiz-option";
-
-            const checkbox =
-                document.createElement("input");
-
-            checkbox.type =
-                "checkbox";
-
-            checkbox.name =
-                "coupleQuizAnswer";
-
-            /*
-             * THIS IS THE IMPORTANT PART.
-             *
-             * Send the actual option ID:
-             *
-             * B
-             * D
-             *
-             * instead of array indexes:
-             *
-             * 1
-             * 3
-             */
-            checkbox.value =
-                id;
-
-            const textElement =
-                document.createElement("span");
-
-            textElement.textContent =
-                text;
-
-            label.append(
-                checkbox,
-                textElement
-            );
-
-            optionsElement.appendChild(
-                label
-            );
-
-            checkbox.addEventListener(
-                "change",
-                () => {
-
-                    label.classList.toggle(
-                        "selected",
-                        checkbox.checked
-                    );
-
-                }
-            );
-        }
-    );
 
     if (messageElement) {
 
@@ -891,6 +778,7 @@ function renderGateQuestion(question) {
             "couple-quiz-message";
     }
 
+
     submitButton.disabled =
         false;
 
@@ -898,27 +786,178 @@ function renderGateQuestion(question) {
         "Submit Answer ❤️";
 }
 
-/* =========================================================
-   GET SELECTED ANSWERS
-   ========================================================= */
 
-function getSelectedQuizAnswers(
-    container = document
+/* =========================================================
+   MCQ OPTIONS
+========================================================= */
+
+function renderMcqOptions(
+    question,
+    container
 ) {
 
-    return Array.from(
-        container.querySelectorAll(
-            'input[name="coupleQuizAnswer"]:checked'
-        )
-    ).map(
-        input => input.value
+    const options =
+        normalizeQuizOptions(
+            question?.options
+        );
+
+
+    options.forEach(
+        option => {
+
+            const label =
+                document.createElement(
+                    "label"
+                );
+
+            label.className =
+                "couple-quiz-option";
+
+
+            const checkbox =
+                document.createElement(
+                    "input"
+                );
+
+            checkbox.type =
+                "checkbox";
+
+            checkbox.name =
+                "coupleQuizAnswer";
+
+            checkbox.value =
+                option.id;
+
+
+            const text =
+                document.createElement(
+                    "span"
+                );
+
+            text.textContent =
+                option.text;
+
+
+            label.append(
+                checkbox,
+                text
+            );
+
+
+            container.appendChild(
+                label
+            );
+
+
+            checkbox.addEventListener(
+                "change",
+                () => {
+
+                    label.classList.toggle(
+                        "selected",
+                        checkbox.checked
+                    );
+                }
+            );
+        }
     );
 }
 
 
 /* =========================================================
-   SUBMIT GATE ANSWER
-   ========================================================= */
+   TEXT ANSWER INPUT
+========================================================= */
+
+function renderTextAnswerInput(
+    container
+) {
+
+    const wrapper =
+        document.createElement(
+            "div"
+        );
+
+    wrapper.className =
+        "couple-quiz-text-answer-wrap";
+
+
+    const input =
+        document.createElement(
+            "input"
+        );
+
+    input.type =
+        "text";
+
+    input.id =
+        "coupleQuizTextAnswerInput";
+
+    input.className =
+        "couple-quiz-text-answer";
+
+    input.name =
+        "coupleQuizTextAnswer";
+
+    input.autocomplete =
+        "off";
+
+    input.maxLength =
+        100;
+
+    input.placeholder =
+        "Type your one-word answer";
+
+
+    const hint =
+        document.createElement(
+            "p"
+        );
+
+    hint.className =
+        "couple-quiz-text-hint";
+
+    hint.textContent =
+        "One word only. Capitalization doesn't matter.";
+
+
+    wrapper.append(
+        input,
+        hint
+    );
+
+
+    container.appendChild(
+        wrapper
+    );
+
+
+    input.addEventListener(
+        "keydown",
+        event => {
+
+            if (
+                event.key ===
+                "Enter"
+            ) {
+
+                event.preventDefault();
+
+                submitCoupleQuizAnswer();
+            }
+        }
+    );
+
+
+    setTimeout(
+        () => input.focus(),
+        50
+    );
+}
+
+
+/* =========================================================
+   SUBMIT
+========================================================= */
 
 async function submitCoupleQuizAnswer() {
 
@@ -940,24 +979,84 @@ async function submitCoupleQuizAnswer() {
         );
 
 
-    const selected =
-        getSelectedQuizAnswers();
+    const isTextQuestion =
+        coupleQuizPendingQuestion
+            .question_type ===
+        "text";
 
 
-    if (
-        !selected.length
-    ) {
+    let selectedAnswers = [];
+    let textAnswer = null;
 
-        if (messageElement) {
 
-            messageElement.textContent =
-                "Select at least one answer ❤️";
+    if (isTextQuestion) {
 
-            messageElement.className =
-                "couple-quiz-message error";
+        const input =
+            quizEl(
+                "coupleQuizTextAnswerInput"
+            );
+
+        textAnswer =
+            input?.value.trim() || "";
+
+
+        if (!textAnswer) {
+
+            showGateMessage(
+                "Please enter your answer ❤️",
+                true
+            );
+
+            input?.focus();
+
+            return;
         }
 
-        return;
+
+        if (
+            /\s/.test(
+                textAnswer
+            )
+        ) {
+
+            showGateMessage(
+                "Please enter exactly one word ❤️",
+                true
+            );
+
+            input?.focus();
+
+            return;
+        }
+
+    } else {
+
+        selectedAnswers =
+            Array.from(
+                document.querySelectorAll(
+                    'input[name="coupleQuizAnswer"]:checked'
+                )
+            )
+            .map(
+                input =>
+                    String(
+                        input.value
+                    )
+            );
+
+
+        if (
+            selectedAnswers.length ===
+            0
+        ) {
+
+            showGateMessage(
+                "Select at least one answer ❤️",
+                true
+            );
+
+            return;
+        }
     }
 
 
@@ -981,7 +1080,14 @@ async function submitCoupleQuizAnswer() {
                         coupleQuizPendingQuestion.id,
 
                     p_selected_answers:
-                        selected
+                        isTextQuestion
+                            ? null
+                            : selectedAnswers,
+
+                    p_text_answer:
+                        isTextQuestion
+                            ? textAnswer
+                            : null
                 }
             );
 
@@ -992,22 +1098,19 @@ async function submitCoupleQuizAnswer() {
 
 
         if (
-            data?.correct === true
+            data?.correct ===
+            true
         ) {
 
-            if (messageElement) {
-
-                messageElement.textContent =
-                    "Correct! You know me pretty well. ❤️";
-
-                messageElement.className =
-                    "couple-quiz-message success";
-            }
+            showGateMessage(
+                "Correct! You know me pretty well. ❤️",
+                false
+            );
 
 
             document
                 .querySelectorAll(
-                    'input[name="coupleQuizAnswer"]'
+                    'input[name="coupleQuizAnswer"], #coupleQuizTextAnswerInput'
                 )
                 .forEach(
                     input => {
@@ -1042,48 +1145,59 @@ async function submitCoupleQuizAnswer() {
         }
 
 
-        /*
-         * WRONG ANSWER
-         */
+        showGateMessage(
+            "Not quite ❤️ Try again.",
+            true
+        );
 
-        if (messageElement) {
 
-            messageElement.textContent =
-                "Not quite ❤️ Try again.";
+        if (isTextQuestion) {
 
-            messageElement.className =
-                "couple-quiz-message error";
+            const input =
+                quizEl(
+                    "coupleQuizTextAnswerInput"
+                );
+
+            if (input) {
+
+                input.value =
+                    "";
+
+                input.disabled =
+                    false;
+
+                input.focus();
+            }
+
+        } else {
+
+            document
+                .querySelectorAll(
+                    'input[name="coupleQuizAnswer"]'
+                )
+                .forEach(
+                    input => {
+
+                        input.checked =
+                            false;
+
+                        input.disabled =
+                            false;
+                    }
+                );
+
+
+            document
+                .querySelectorAll(
+                    ".couple-quiz-option"
+                )
+                .forEach(
+                    option =>
+                        option.classList.remove(
+                            "selected"
+                        )
+                );
         }
-
-
-        document
-            .querySelectorAll(
-                'input[name="coupleQuizAnswer"]'
-            )
-            .forEach(
-                input => {
-
-                    input.checked =
-                        false;
-
-                    input.disabled =
-                        false;
-                }
-            );
-
-
-        document
-            .querySelectorAll(
-                ".couple-quiz-option"
-            )
-            .forEach(
-                option => {
-
-                    option.classList.remove(
-                        "selected"
-                    );
-                }
-            );
 
 
         submitButton.disabled =
@@ -1091,6 +1205,7 @@ async function submitCoupleQuizAnswer() {
 
         submitButton.textContent =
             "Try Again ❤️";
+
 
     } catch (error) {
 
@@ -1100,16 +1215,12 @@ async function submitCoupleQuizAnswer() {
         );
 
 
-        if (messageElement) {
-
-            messageElement.textContent =
-                getQuizErrorMessage(
-                    error
-                );
-
-            messageElement.className =
-                "couple-quiz-message error";
-        }
+        showGateMessage(
+            getQuizErrorMessage(
+                error
+            ),
+            true
+        );
 
 
         submitButton.disabled =
@@ -1122,8 +1233,38 @@ async function submitCoupleQuizAnswer() {
 
 
 /* =========================================================
-   OPEN QUIZ MODAL
-   ========================================================= */
+   MESSAGE
+========================================================= */
+
+function showGateMessage(
+    message,
+    isError
+) {
+
+    const element =
+        quizEl(
+            "coupleQuizGateMessage"
+        );
+
+    if (!element) {
+        return;
+    }
+
+    element.textContent =
+        message;
+
+    element.className =
+        `couple-quiz-message ${
+            isError
+                ? "error"
+                : "success"
+        }`;
+}
+
+
+/* =========================================================
+   MODAL
+========================================================= */
 
 async function openQuizModal(
     questionId = null
@@ -1133,7 +1274,6 @@ async function openQuizModal(
         quizEl(
             "coupleQuizModalBody"
         );
-
 
     if (!body) {
         return;
@@ -1164,19 +1304,13 @@ async function openQuizModal(
 
 
         /*
-         * IMPORTANT:
-         *
-         * If this user has a question
-         * waiting from their partner,
-         * ALWAYS show that first.
+         * Partner's question always
+         * gets priority.
          */
 
         if (
             state?.pending_question
         ) {
-
-            coupleQuizPendingQuestion =
-                state.pending_question;
 
             renderModalAnswerQuestion(
                 state.pending_question
@@ -1185,15 +1319,6 @@ async function openQuizModal(
             return;
         }
 
-
-        coupleQuizPendingQuestion =
-            null;
-
-
-        /*
-         * If our own question is waiting
-         * for the partner, show its status.
-         */
 
         if (
             state?.my_active_question
@@ -1207,20 +1332,13 @@ async function openQuizModal(
         }
 
 
-        /*
-         * Notification supplied a question ID.
-         */
-
-        if (
-            questionId
-        ) {
+        if (questionId) {
 
             const opened =
                 await openQuizQuestionFromNotification(
                     questionId,
                     false
                 );
-
 
             if (opened) {
                 return;
@@ -1229,6 +1347,7 @@ async function openQuizModal(
 
 
         renderCreateQuestionForm();
+
 
     } catch (error) {
 
@@ -1241,9 +1360,7 @@ async function openQuizModal(
         body.innerHTML = `
             <div class="couple-quiz-message error">
                 ${quizEscape(
-                    getQuizErrorMessage(
-                        error
-                    )
+                    getQuizErrorMessage(error)
                 )}
             </div>
         `;
@@ -1252,8 +1369,8 @@ async function openQuizModal(
 
 
 /* =========================================================
-   MODAL ANSWER QUESTION
-   ========================================================= */
+   MODAL ANSWER
+========================================================= */
 
 function renderModalAnswerQuestion(
     question
@@ -1264,14 +1381,14 @@ function renderModalAnswerQuestion(
             "coupleQuizModalBody"
         );
 
-
     if (!body) {
         return;
     }
 
 
-    const options =
-        question?.options || {};
+    const isText =
+        question?.question_type ===
+        "text";
 
 
     body.innerHTML = `
@@ -1291,14 +1408,34 @@ function renderModalAnswerQuestion(
                 )}
             </div>
 
-            <p class="couple-quiz-form-intro">
-                Choose every answer you think is correct.
-            </p>
+            ${
+                isText
+                    ? `
+                        <p class="couple-quiz-form-intro">
+                            Answer using one word.
+                            Capitalization doesn't matter.
+                        </p>
 
-            <div
-                id="coupleQuizModalAnswerOptions"
-                class="couple-quiz-options"
-            ></div>
+                        <input
+                            id="coupleQuizModalTextAnswer"
+                            class="couple-quiz-text-answer"
+                            type="text"
+                            maxlength="100"
+                            autocomplete="off"
+                            placeholder="Your answer"
+                        >
+                    `
+                    : `
+                        <p class="couple-quiz-form-intro">
+                            Choose every answer you think is correct.
+                        </p>
+
+                        <div
+                            id="coupleQuizModalAnswerOptions"
+                            class="couple-quiz-options"
+                        ></div>
+                    `
+            }
 
             <p
                 id="coupleQuizModalAnswerMessage"
@@ -1318,10 +1455,140 @@ function renderModalAnswerQuestion(
     `;
 
 
-    const optionsElement =
+    const messageElement =
         quizEl(
-            "coupleQuizModalAnswerOptions"
+            "coupleQuizModalAnswerMessage"
         );
+
+    const submitButton =
+        quizEl(
+            "coupleQuizModalSubmitAnswerButton"
+        );
+
+
+    if (isText) {
+
+        const input =
+            quizEl(
+                "coupleQuizModalTextAnswer"
+            );
+
+
+        input?.addEventListener(
+            "keydown",
+            event => {
+
+                if (
+                    event.key ===
+                    "Enter"
+                ) {
+
+                    event.preventDefault();
+
+                    submitModalAnswer(
+                        question
+                    );
+                }
+            }
+        );
+
+
+        setTimeout(
+            () =>
+                input?.focus(),
+            50
+        );
+
+    } else {
+
+        const optionsElement =
+            quizEl(
+                "coupleQuizModalAnswerOptions"
+            );
+
+
+        normalizeQuizOptions(
+            question?.options
+        )
+        .forEach(
+            option => {
+
+                const label =
+                    document.createElement(
+                        "label"
+                    );
+
+                label.className =
+                    "couple-quiz-option";
+
+
+                const checkbox =
+                    document.createElement(
+                        "input"
+                    );
+
+                checkbox.type =
+                    "checkbox";
+
+                checkbox.name =
+                    "coupleQuizModalAnswer";
+
+                checkbox.value =
+                    option.id;
+
+
+                const text =
+                    document.createElement(
+                        "span"
+                    );
+
+                text.textContent =
+                    option.text;
+
+
+                label.append(
+                    checkbox,
+                    text
+                );
+
+
+                optionsElement.appendChild(
+                    label
+                );
+
+
+                checkbox.addEventListener(
+                    "change",
+                    () => {
+
+                        label.classList.toggle(
+                            "selected",
+                            checkbox.checked
+                        );
+                    }
+                );
+            }
+        );
+    }
+
+
+    submitButton?.addEventListener(
+        "click",
+        () =>
+            submitModalAnswer(
+                question
+            )
+    );
+}
+
+
+/* =========================================================
+   MODAL SUBMIT
+========================================================= */
+
+async function submitModalAnswer(
+    question
+) {
 
     const messageElement =
         quizEl(
@@ -1334,255 +1601,252 @@ function renderModalAnswerQuestion(
         );
 
 
-    Object.entries(
-        options
-    ).forEach(
-        ([key, value]) => {
-
-            const label =
-                document.createElement(
-                    "label"
-                );
-
-            label.className =
-                "couple-quiz-option";
+    const isText =
+        question?.question_type ===
+        "text";
 
 
-            const checkbox =
-                document.createElement(
-                    "input"
-                );
+    let selected =
+        [];
 
-            checkbox.type =
-                "checkbox";
-
-            checkbox.name =
-                "coupleQuizModalAnswer";
-
-            checkbox.value =
-                key;
+    let textAnswer =
+        null;
 
 
-            const text =
-                document.createElement(
-                    "span"
-                );
+    if (isText) {
 
-            text.textContent =
-                value;
+        const input =
+            quizEl(
+                "coupleQuizModalTextAnswer"
+            );
+
+        textAnswer =
+            input?.value.trim() || "";
 
 
-            label.append(
-                checkbox,
-                text
+        if (!textAnswer) {
+
+            messageElement.textContent =
+                "Please enter your answer ❤️";
+
+            messageElement.className =
+                "couple-quiz-message error";
+
+            input?.focus();
+
+            return;
+        }
+
+
+        if (
+            /\s/.test(
+                textAnswer
+            )
+        ) {
+
+            messageElement.textContent =
+                "Please enter exactly one word ❤️";
+
+            messageElement.className =
+                "couple-quiz-message error";
+
+            input?.focus();
+
+            return;
+        }
+
+    } else {
+
+        selected =
+            Array.from(
+                document.querySelectorAll(
+                    'input[name="coupleQuizModalAnswer"]:checked'
+                )
+            )
+            .map(
+                input =>
+                    String(
+                        input.value
+                    )
             );
 
 
-            optionsElement.appendChild(
-                label
-            );
+        if (!selected.length) {
+
+            messageElement.textContent =
+                "Select at least one answer ❤️";
+
+            messageElement.className =
+                "couple-quiz-message error";
+
+            return;
+        }
+    }
 
 
-            checkbox.addEventListener(
-                "change",
-                () => {
+    submitButton.disabled =
+        true;
 
-                    label.classList.toggle(
-                        "selected",
-                        checkbox.checked
-                    );
+    submitButton.textContent =
+        "Checking... ❤️";
+
+
+    try {
+
+        const {
+            data,
+            error
+        } =
+            await coupleQuizSupabase.rpc(
+                "submit_couple_quiz_answer",
+                {
+                    p_question_id:
+                        question.id,
+
+                    p_selected_answers:
+                        isText
+                            ? null
+                            : selected,
+
+                    p_text_answer:
+                        isText
+                            ? textAnswer
+                            : null
                 }
             );
+
+
+        if (error) {
+            throw error;
         }
-    );
 
 
-    submitButton.addEventListener(
-        "click",
-        async () => {
+        if (
+            data?.correct ===
+            true
+        ) {
 
-            const selected =
-    Array.from(
-        document.querySelectorAll(
-            'input[name="coupleQuizAnswer"]:checked'
-        )
-    )
-    .map(
-        input =>
-            String(input.value)
-    );
+            messageElement.textContent =
+                "Correct! You know me pretty well. ❤️";
 
+            messageElement.className =
+                "couple-quiz-message success";
 
-            if (
-                !selected.length
-            ) {
-
-                messageElement.textContent =
-                    "Select at least one answer ❤️";
-
-                messageElement.className =
-                    "couple-quiz-message error";
-
-                return;
-            }
-
-
-            submitButton.disabled =
-                true;
 
             submitButton.textContent =
-                "Checking... ❤️";
+                "Correct ❤️";
 
 
-            try {
+            setTimeout(
+                async () => {
 
-                const {
-                    data,
-                    error
-                } =
-                    await coupleQuizSupabase.rpc(
-                        "submit_couple_quiz_answer",
-                        {
-                            p_question_id:
-                                question.id,
-
-                            p_selected_answers:
-                                selected
-                        }
+                    setQuizModalOpen(
+                        false
                     );
 
+                    coupleQuizPendingQuestion =
+                        null;
 
-                if (error) {
-                    throw error;
-                }
+                    await refreshCoupleQuiz();
 
-
-                if (
-                    data?.correct === true
-                ) {
-
-                    messageElement.textContent =
-                        "Correct! You know me pretty well. ❤️";
-
-                    messageElement.className =
-                        "couple-quiz-message success";
+                },
+                900
+            );
 
 
-                    optionsElement
-                        .querySelectorAll(
-                            "input"
-                        )
-                        .forEach(
-                            input => {
-                                input.disabled =
-                                    true;
-                            }
-                        );
+            return;
+        }
 
 
-                    submitButton.textContent =
-                        "Correct ❤️";
+        messageElement.textContent =
+            "Not quite ❤️ Try again.";
+
+        messageElement.className =
+            "couple-quiz-message error";
 
 
-                    setTimeout(
-                        async () => {
+        if (isText) {
 
-                            setQuizModalOpen(
-                                false
-                            );
+            const input =
+                quizEl(
+                    "coupleQuizModalTextAnswer"
+                );
 
-                            coupleQuizPendingQuestion =
-                                null;
+            input.value =
+                "";
 
-                            await refreshCoupleQuiz();
+            input.disabled =
+                false;
 
-                        },
-                        900
-                    );
+            input.focus();
 
+        } else {
 
-                    return;
-                }
+            document
+                .querySelectorAll(
+                    'input[name="coupleQuizModalAnswer"]'
+                )
+                .forEach(
+                    input => {
 
+                        input.checked =
+                            false;
 
-                /*
-                 * WRONG ANSWER
-                 */
-
-                messageElement.textContent =
-                    "Not quite ❤️ Try again.";
-
-                messageElement.className =
-                    "couple-quiz-message error";
-
-
-                optionsElement
-                    .querySelectorAll(
-                        "input"
-                    )
-                    .forEach(
-                        input => {
-
-                            input.checked =
-                                false;
-
-                            input.disabled =
-                                false;
-                        }
-                    );
-
-
-                optionsElement
-                    .querySelectorAll(
-                        ".couple-quiz-option"
-                    )
-                    .forEach(
-                        option => {
-
-                            option.classList.remove(
-                                "selected"
-                            );
-                        }
-                    );
-
-
-                submitButton.disabled =
-                    false;
-
-                submitButton.textContent =
-                    "Try Again ❤️";
-
-            } catch (error) {
-
-                console.error(
-                    "Couple Quiz modal answer error:",
-                    error
+                        input.disabled =
+                            false;
+                    }
                 );
 
 
-                messageElement.textContent =
-                    getQuizErrorMessage(
-                        error
-                    );
-
-                messageElement.className =
-                    "couple-quiz-message error";
-
-
-                submitButton.disabled =
-                    false;
-
-                submitButton.textContent =
-                    "Submit Answer ❤️";
-            }
+            document
+                .querySelectorAll(
+                    "#coupleQuizModalAnswerOptions .couple-quiz-option"
+                )
+                .forEach(
+                    option =>
+                        option.classList.remove(
+                            "selected"
+                        )
+                );
         }
-    );
+
+
+        submitButton.disabled =
+            false;
+
+        submitButton.textContent =
+            "Try Again ❤️";
+
+
+    } catch (error) {
+
+        console.error(
+            "Couple Quiz modal answer error:",
+            error
+        );
+
+
+        messageElement.textContent =
+            getQuizErrorMessage(
+                error
+            );
+
+        messageElement.className =
+            "couple-quiz-message error";
+
+
+        submitButton.disabled =
+            false;
+
+        submitButton.textContent =
+            "Submit Answer ❤️";
+    }
 }
 
 
 /* =========================================================
-   OWN QUESTION PENDING
-   ========================================================= */
+   OWN QUESTION
+========================================================= */
 
 function renderOwnPendingQuestion(
     question
@@ -1593,13 +1857,20 @@ function renderOwnPendingQuestion(
             "coupleQuizModalBody"
         );
 
-
     if (!body) {
         return;
     }
 
 
+    const typeLabel =
+        question?.question_type ===
+        "text"
+            ? "One-word answer"
+            : "Multiple choice";
+
+
     body.innerHTML = `
+
         <div class="quiz-status-card">
 
             <div class="quiz-status-icon">
@@ -1621,6 +1892,10 @@ function renderOwnPendingQuestion(
                 )}
             </div>
 
+            <span class="couple-quiz-type-badge">
+                ${typeLabel}
+            </span>
+
             <button
                 id="refreshCoupleQuizStatus"
                 class="primary-button full-width"
@@ -1640,7 +1915,6 @@ function renderOwnPendingQuestion(
         async () => {
 
             await openQuizModal();
-
         }
     );
 }
@@ -1648,31 +1922,51 @@ function renderOwnPendingQuestion(
 
 /* =========================================================
    CREATE QUESTION FORM
-   ========================================================= */
+========================================================= */
 
 function renderCreateQuestionForm() {
 
     const body =
-        quizEl(
-            "coupleQuizModalBody"
-        );
-
+        quizEl("coupleQuizModalBody");
 
     if (!body) {
         return;
     }
 
-
     body.innerHTML = `
+
         <div class="couple-quiz-form">
+
+            <div class="quiz-status-icon">
+                💕
+            </div>
+
+            <h3>
+                Ask Your Love
+            </h3>
 
             <p class="couple-quiz-form-intro">
                 Ask something only the two of you would know. ❤️
             </p>
 
-            <label
-                for="coupleQuizQuestionInput"
+            <label for="coupleQuizQuestionType">
+                Question type
+            </label>
+
+            <select
+                id="coupleQuizQuestionType"
+                class="couple-quiz-question-type"
             >
+                <option value="mcq">
+                    Multiple Choice
+                </option>
+
+                <option value="text">
+                    One Word Answer
+                </option>
+            </select>
+
+            <label for="coupleQuizQuestionInput">
                 Your question
             </label>
 
@@ -1683,23 +1977,66 @@ function renderCreateQuestionForm() {
                 placeholder="What was the first place we visited together?"
             ></textarea>
 
-            <div class="couple-quiz-form-label">
-                Answers
-                <span>
-                    Tick every correct answer.
-                </span>
+
+            <!-- ================================
+                 MULTIPLE CHOICE FORM
+            ================================= -->
+
+            <div
+                id="coupleQuizMcqCreator"
+                class="couple-quiz-create-section"
+            >
+
+                <div class="couple-quiz-form-label">
+                    Answers
+                    <span>
+                        Tick every correct answer.
+                    </span>
+                </div>
+
+                ${renderCreateOption("A")}
+                ${renderCreateOption("B")}
+                ${renderCreateOption("C")}
+                ${renderCreateOption("D")}
+
             </div>
 
-            ${renderCreateOption("A")}
-            ${renderCreateOption("B")}
-            ${renderCreateOption("C")}
-            ${renderCreateOption("D")}
+
+            <!-- ================================
+                 ONE WORD FORM
+            ================================= -->
+
+            <div
+                id="coupleQuizTextCreator"
+                class="couple-quiz-create-section"
+                hidden
+            >
+
+                <div class="couple-quiz-form-label">
+                    Correct answer
+                    <span>
+                        One word only. Case doesn't matter.
+                    </span>
+                </div>
+
+                <input
+                    id="coupleQuizCorrectTextAnswer"
+                    class="couple-quiz-text-answer"
+                    type="text"
+                    maxlength="100"
+                    autocomplete="off"
+                    placeholder="e.g. Blue"
+                >
+
+            </div>
+
 
             <p
                 id="coupleQuizCreateMessage"
                 class="couple-quiz-message"
                 aria-live="polite"
             ></p>
+
 
             <button
                 id="createCoupleQuizButton"
@@ -1713,24 +2050,77 @@ function renderCreateQuestionForm() {
     `;
 
 
+    const typeSelect =
+        quizEl("coupleQuizQuestionType");
+
+
+    typeSelect?.addEventListener(
+        "change",
+        updateQuestionCreatorType
+    );
+
+
     quizEl(
         "createCoupleQuizButton"
     )?.addEventListener(
         "click",
         createCoupleQuizQuestion
     );
+
+
+    // Make sure the correct form is shown initially.
+    updateQuestionCreatorType();
 }
 
 
-/* =========================================================
-   CREATE OPTIONS
-   ========================================================= */
+function updateQuestionCreatorType() {
+
+    const type =
+        quizEl(
+            "coupleQuizQuestionType"
+        )?.value || "mcq";
+
+
+    const mcqCreator =
+        quizEl(
+            "coupleQuizMcqCreator"
+        );
+
+    const textCreator =
+        quizEl(
+            "coupleQuizTextCreator"
+        );
+
+
+    if (!mcqCreator || !textCreator) {
+        return;
+    }
+
+
+    if (type === "mcq") {
+
+        // Show MCQ form
+        mcqCreator.hidden = false;
+
+        // Hide One Word form
+        textCreator.hidden = true;
+
+    } else {
+
+        // Hide MCQ form
+        mcqCreator.hidden = true;
+
+        // Show One Word form
+        textCreator.hidden = false;
+    }
+}
 
 function renderCreateOption(
     key
 ) {
 
     return `
+
         <div class="couple-quiz-create-option">
 
             <input
@@ -1754,13 +2144,18 @@ function renderCreateOption(
 
 /* =========================================================
    CREATE QUESTION
-   ========================================================= */
+========================================================= */
 
 async function createCoupleQuizQuestion() {
 
     const questionInput =
         quizEl(
             "coupleQuizQuestionInput"
+        );
+
+    const typeInput =
+        quizEl(
+            "coupleQuizQuestionType"
         );
 
     const button =
@@ -1770,8 +2165,11 @@ async function createCoupleQuizQuestion() {
 
 
     const questionText =
-        questionInput?.value.trim() ||
-        "";
+        questionInput?.value.trim() || "";
+
+
+    const questionType =
+        typeInput?.value || "mcq";
 
 
     if (!questionText) {
@@ -1785,79 +2183,124 @@ async function createCoupleQuizQuestion() {
     }
 
 
-    const options = {};
+    let options = {};
+    let correctAnswers = [];
+    let correctTextAnswer = null;
 
 
-    [
-        "A",
-        "B",
-        "C",
-        "D"
-    ].forEach(
-        key => {
-
-            const input =
-                quizEl(
-                    `coupleQuizOption${key}`
-                );
-
-            const value =
-                input?.value.trim() ||
-                "";
-
-
-            if (value) {
-                options[key] =
-                    value;
-            }
-        }
-    );
-
+    /* =====================================================
+       MCQ
+    ===================================================== */
 
     if (
-        Object.keys(
-            options
-        ).length < 2
+        questionType ===
+        "mcq"
     ) {
 
-        showQuizCreateMessage(
-            "Please provide at least two options.",
-            true
-        );
+        ["A", "B", "C", "D"]
+            .forEach(
+                key => {
 
-        return;
+                    const input =
+                        quizEl(
+                            `coupleQuizOption${key}`
+                        );
+
+                    const value =
+                        input?.value.trim() ||
+                        "";
+
+                    if (value) {
+                        options[key] =
+                            value;
+                    }
+                }
+            );
+
+
+        if (
+            Object.keys(options)
+                .length < 2
+        ) {
+
+            showQuizCreateMessage(
+                "Please provide at least two options.",
+                true
+            );
+
+            return;
+        }
+
+
+        correctAnswers =
+            Array.from(
+                document.querySelectorAll(
+                    ".couple-quiz-correct:checked"
+                )
+            )
+            .map(
+                checkbox =>
+                    checkbox.value
+            )
+            .filter(
+                key =>
+                    Object.prototype.hasOwnProperty.call(
+                        options,
+                        key
+                    )
+            );
+
+
+        if (
+            !correctAnswers.length
+        ) {
+
+            showQuizCreateMessage(
+                "Select at least one correct answer.",
+                true
+            );
+
+            return;
+        }
     }
 
 
-    const correctAnswers =
-        Array.from(
-            document.querySelectorAll(
-                ".couple-quiz-correct:checked"
+    /* =====================================================
+       TEXT
+    ===================================================== */
+
+    else {
+
+        correctTextAnswer =
+            quizEl(
+                "coupleQuizCorrectTextAnswer"
+            )?.value.trim() || "";
+
+
+        if (!correctTextAnswer) {
+
+            showQuizCreateMessage(
+                "Please enter the correct answer.",
+                true
+            );
+
+            return;
+        }
+
+
+        if (
+            /\s/.test(
+                correctTextAnswer
             )
-        )
-        .map(
-            checkbox =>
-                checkbox.value
-        )
-        .filter(
-            key =>
-                Object.prototype.hasOwnProperty.call(
-                    options,
-                    key
-                )
-        );
+        ) {
 
+            showQuizCreateMessage(
+                "The correct answer must contain exactly one word.",
+                true
+            );
 
-    if (
-        !correctAnswers.length
-    ) {
-
-        showQuizCreateMessage(
-            "Select at least one correct answer.",
-            true
-        );
-
-        return;
+            return;
+        }
     }
 
 
@@ -1880,11 +2323,26 @@ async function createCoupleQuizQuestion() {
                     p_question_text:
                         questionText,
 
+                    p_question_type:
+                        questionType,
+
                     p_options:
-                        options,
+                        questionType ===
+                        "mcq"
+                            ? options
+                            : [],
 
                     p_correct_option_ids:
-                        correctAnswers
+                        questionType ===
+                        "mcq"
+                            ? correctAnswers
+                            : [],
+
+                    p_correct_text_answer:
+                        questionType ===
+                        "text"
+                            ? correctTextAnswer
+                            : null
                 }
             );
 
@@ -1945,10 +2403,6 @@ async function createCoupleQuizQuestion() {
 }
 
 
-/* =========================================================
-   CREATE MESSAGE
-   ========================================================= */
-
 function showQuizCreateMessage(
     message,
     isError
@@ -1959,15 +2413,12 @@ function showQuizCreateMessage(
             "coupleQuizCreateMessage"
         );
 
-
     if (!element) {
         return;
     }
 
-
     element.textContent =
         message;
-
 
     element.className =
         `couple-quiz-message ${
@@ -1980,7 +2431,7 @@ function showQuizCreateMessage(
 
 /* =========================================================
    UNAVAILABLE
-   ========================================================= */
+========================================================= */
 
 function renderQuizUnavailableState(
     error = null
@@ -1991,38 +2442,35 @@ function renderQuizUnavailableState(
             "openCoupleQuizButton"
         );
 
-
     if (!button) {
         return;
     }
-
 
     button.classList.remove(
         "quiz-button-pending"
     );
 
-
     button.textContent =
         "💕 Couple Quiz";
 
-
     button.title =
         error
-            ? getQuizErrorMessage(error)
+            ? getQuizErrorMessage(
+                error
+            )
             : "Couple Quiz";
 }
 
 
 /* =========================================================
-   NOTIFICATION HASH
-   ========================================================= */
+   NOTIFICATION NAVIGATION
+========================================================= */
 
 async function focusQuizNotificationHash() {
 
     const hash =
         window.location.hash ||
         "";
-
 
     const prefix =
         "#quiz-question-";
@@ -2071,10 +2519,6 @@ async function focusQuizNotificationHash() {
 }
 
 
-/* =========================================================
-   OPEN QUESTION FROM NOTIFICATION
-   ========================================================= */
-
 async function openQuizQuestionFromNotification(
     questionId,
     showModal = true
@@ -2084,7 +2528,6 @@ async function openQuizQuestionFromNotification(
         quizEl(
             "coupleQuizModalBody"
         );
-
 
     if (!body) {
         return false;
@@ -2105,16 +2548,6 @@ async function openQuizQuestionFromNotification(
 
     try {
 
-        /*
-         * FIRST:
-         *
-         * Get the authoritative quiz state.
-         *
-         * If this notification belongs to the
-         * question currently waiting for THIS USER,
-         * render the actual answer interface.
-         */
-
         const state =
             await getCoupleQuizState();
 
@@ -2130,34 +2563,24 @@ async function openQuizQuestionFromNotification(
             String(questionId)
         ) {
 
-            coupleQuizPendingQuestion =
-                pending;
-
-
             renderModalAnswerQuestion(
                 pending
             );
-
 
             return true;
         }
 
 
-        /*
-         * Otherwise fetch the notification's
-         * question directly.
-         */
-
         const {
             data: question,
-            error: questionError
+            error
         } =
             await coupleQuizSupabase
                 .from(
                     "couple_quiz_questions"
                 )
                 .select(
-                    "id, question_text, options, question_date, created_by, is_active, is_answered, answered_at, answered_by"
+                    "id, question_text, question_type, options, question_date, created_by, is_active, is_answered, answered_at, answered_by"
                 )
                 .eq(
                     "id",
@@ -2166,8 +2589,8 @@ async function openQuizQuestionFromNotification(
                 .maybeSingle();
 
 
-        if (questionError) {
-            throw questionError;
+        if (error) {
+            throw error;
         }
 
 
@@ -2183,69 +2606,38 @@ async function openQuizQuestionFromNotification(
         }
 
 
-        /*
-         * Question exists but is not currently
-         * the pending question for this user.
-         */
+        body.innerHTML = `
 
-        if (
-            !question.is_answered
-        ) {
+            <div class="quiz-status-card">
 
-            body.innerHTML = `
-                <div class="quiz-status-card">
-
-                    <div class="quiz-status-icon">
-                        ⏳
-                    </div>
-
-                    <h3>
-                        Couple Quiz Question
-                    </h3>
-
-                    <div class="quiz-own-question">
-                        ${quizEscape(
-                            question.question_text
-                        )}
-                    </div>
-
-                    <p>
-                        This question is still waiting for an answer. ❤️
-                    </p>
-
-                    <p class="couple-quiz-notification-status">
-                        Open Couple Quiz to continue.
-                    </p>
-
+                <div class="quiz-status-icon">
+                    ${
+                        question.is_answered
+                            ? "💕"
+                            : "⏳"
+                    }
                 </div>
-            `;
 
-        } else {
+                <h3>
+                    Couple Quiz Question
+                </h3>
 
-            body.innerHTML = `
-                <div class="quiz-status-card">
-
-                    <div class="quiz-status-icon">
-                        💕
-                    </div>
-
-                    <h3>
-                        Couple Quiz Question
-                    </h3>
-
-                    <div class="quiz-own-question">
-                        ${quizEscape(
-                            question.question_text
-                        )}
-                    </div>
-
-                    <p>
-                        This question has been answered correctly. ❤️
-                    </p>
-
+                <div class="quiz-own-question">
+                    ${quizEscape(
+                        question.question_text
+                    )}
                 </div>
-            `;
-        }
+
+                <p>
+                    ${
+                        question.is_answered
+                            ? "This question has been answered correctly. ❤️"
+                            : "This question is still waiting for an answer. ❤️"
+                    }
+                </p>
+
+            </div>
+        `;
 
 
         return true;
@@ -2259,155 +2651,28 @@ async function openQuizQuestionFromNotification(
         );
 
 
-        /*
-         * FALLBACK
-         *
-         * Your existing zero-argument RPC.
-         */
+        body.innerHTML = `
 
-        try {
+            <div class="couple-quiz-message error">
 
-            const {
-                data,
-                error: rpcError
-            } =
-                await coupleQuizSupabase.rpc(
-                    "get_couple_quiz_question"
-                );
+                ${quizEscape(
+                    getQuizErrorMessage(
+                        error
+                    )
+                )}
+
+            </div>
+        `;
 
 
-            if (rpcError) {
-                throw rpcError;
-            }
-
-
-            if (!data) {
-
-                body.innerHTML = `
-                    <div class="couple-quiz-message">
-                        This question is no longer active. ❤️
-                    </div>
-                `;
-
-                return false;
-            }
-
-
-            if (
-                data.id &&
-                String(data.id) !==
-                String(questionId)
-            ) {
-
-                body.innerHTML = `
-                    <div class="couple-quiz-message">
-                        This question is no longer the active Couple Quiz question. ❤️
-                    </div>
-                `;
-
-                return false;
-            }
-
-
-            const state =
-                await getCoupleQuizState()
-                    .catch(
-                        () => null
-                    );
-
-
-            if (
-                state?.pending_question &&
-                String(
-                    state.pending_question.id
-                ) ===
-                String(questionId)
-            ) {
-
-                coupleQuizPendingQuestion =
-                    state.pending_question;
-
-
-                renderModalAnswerQuestion(
-                    state.pending_question
-                );
-
-
-                return true;
-            }
-
-
-            body.innerHTML = `
-                <div class="quiz-status-card">
-
-                    <div class="quiz-status-icon">
-                        💕
-                    </div>
-
-                    <h3>
-                        Couple Quiz Question
-                    </h3>
-
-                    <div class="quiz-own-question">
-                        ${quizEscape(
-                            data.question_text
-                        )}
-                    </div>
-
-                    <p>
-                        ${
-                            data.is_answered
-                                ? "This question has been answered correctly. ❤️"
-                                : "This question is still waiting for an answer. ⏳"
-                        }
-                    </p>
-
-                </div>
-            `;
-
-
-            return true;
-
-
-        } catch (
-            fallbackError
-        ) {
-
-            console.error(
-                "Couple Quiz notification fallback error:",
-                fallbackError
-            );
-
-
-            body.innerHTML = `
-                <div class="couple-quiz-message error">
-                    ${quizEscape(
-                        getQuizErrorMessage(
-                            fallbackError
-                        )
-                    )}
-                </div>
-            `;
-
-
-            return false;
-        }
+        return false;
     }
 }
 
 
 /* =========================================================
-   SAFE CLOSE
-   ========================================================= */
-
-function closeQuizGateSafely() {
-    setQuizGateOpen(false);
-}
-
-
-/* =========================================================
    START
-   ========================================================= */
+========================================================= */
 
 document.addEventListener(
     "DOMContentLoaded",
