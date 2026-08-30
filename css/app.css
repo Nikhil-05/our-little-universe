@@ -2794,3 +2794,84 @@ body {
     }
 
 }
+.darloo-btn {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 9px 17px;
+    border-radius: 999px;
+    background: linear-gradient(135deg, #fff7fa, #ffe8ef);
+    color: #8f465b;
+    border: 1px solid #f3b8c8;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow:
+        0 4px 14px rgba(184, 72, 103, 0.12),
+        inset 0 1px 0 rgba(255,255,255,0.8);
+    transition:
+        transform 0.2s ease,
+        box-shadow 0.2s ease,
+        background 0.2s ease;
+}
+
+.darloo-btn:hover {
+    transform: translateY(-2px);
+    background: linear-gradient(135deg, #fffafd, #ffdce7);
+    box-shadow:
+        0 7px 20px rgba(184, 72, 103, 0.2),
+        0 0 0 4px rgba(244, 155, 180, 0.08);
+}
+
+.darloo-btn:active {
+    transform: translateY(0);
+}
+
+.darloo-btn .heart {
+    font-size: 16px;
+    line-height: 1;
+    animation: darlooHeart 1.8s ease-in-out infinite;
+}
+
+.darloo-btn::before,
+.darloo-btn::after {
+    position: absolute;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.darloo-btn::before {
+    content: "♥";
+    font-size: 9px;
+    color: #f28aa6;
+    right: 7px;
+    top: -7px;
+    transform: rotate(18deg);
+}
+
+.darloo-btn::after {
+    content: "♥";
+    font-size: 7px;
+    color: #f5b1c3;
+    right: 1px;
+    top: 1px;
+    transform: rotate(-15deg);
+}
+
+.darloo-btn:hover::before,
+.darloo-btn:hover::after {
+    opacity: 1;
+}
+
+@keyframes darlooHeart {
+    0%, 100% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.12);
+    }
+}
